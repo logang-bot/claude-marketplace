@@ -1,0 +1,55 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "logang-bot",
+  "description": "Personal engineering conventions packaged as installable plugins: platform-specific rules, language-agnostic code style, and release workflow.",
+  "owner": {
+    "name": "logang-bot",
+    "email": "logangch8v@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "general-code-style",
+      "description": "Language-agnostic style rules for file, class, and function size, parameter counts, and self-describing names. Ships a style reviewer agent and a size-check hook.",
+      "author": {
+        "name": "restrusher"
+      },
+      "category": "productivity",
+      "keywords": [
+        "code-style",
+        "conventions",
+        "refactoring"
+      ],
+      "source": "./plugins/general-code-style"
+    },
+    {
+      "name": "android-compose",
+      "description": "Android, Kotlin, and Jetpack Compose conventions: composable structure, previews, navigation routes, string resources, and clean-architecture use cases.",
+      "author": {
+        "name": "restrusher"
+      },
+      "category": "development",
+      "keywords": [
+        "android",
+        "kotlin",
+        "jetpack-compose",
+        "clean-architecture"
+      ],
+      "source": "./plugins/android-compose"
+    },
+    {
+      "name": "dev-workflow",
+      "description": "Release and documentation workflow: two-file changelog discipline, docs upkeep, and a hook that keeps git write commands in the developer's hands.",
+      "author": {
+        "name": "restrusher"
+      },
+      "category": "workflow",
+      "keywords": [
+        "changelog",
+        "release",
+        "documentation",
+        "git"
+      ],
+      "source": "./plugins/dev-workflow"
+    }
+  ]
+}

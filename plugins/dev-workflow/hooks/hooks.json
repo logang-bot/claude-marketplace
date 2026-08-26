@@ -1,0 +1,28 @@
+{
+  "description": "Keeps git write commands with the developer, and reminds when code changes without a docs update",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-git-writes.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/docs-reminder.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

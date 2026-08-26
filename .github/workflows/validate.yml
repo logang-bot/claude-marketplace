@@ -1,0 +1,69 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON syntax
+        run: |
+          for f in .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json plugins/*/hooks/hooks.json; do
+            [ -e "$f" ] || continue
+            python3 -m json.tool "$f" > /dev/null
+            echo "ok  $f"
+          done
+
+      - name: Check every marketplace source path exists
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+          data = json.load(open('.claude-plugin/marketplace.json'))
+          failed = False
+          for entry in data['plugins']:
+              source = entry['source']
+              if not isinstance(source, str):
+                  continue
+              manifest = pathlib.Path(source) / '.claude-plugin' / 'plugin.json'
+              if not manifest.is_file():
+                  print(f"missing {manifest} for plugin {entry['name']}")
+                  failed = True
+                  continue
+              name = json.load(open(manifest))['name']
+              if name != entry['name']:
+                  print(f"name mismatch: marketplace says {entry['name']}, manifest says {name}")
+                  failed = True
+              else:
+                  print(f"ok  {entry['name']}")
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: Check skill frontmatter
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys
+          failed = False
+          for skill in pathlib.Path('plugins').glob('*/skills/*/SKILL.md'):
+              lines = skill.read_text().split('\n')
+              if lines[0] != '---' or '---' not in lines[1:]:
+                  print(f"{skill}: missing frontmatter")
+                  failed = True
+                  continue
+              front = lines[1:lines.index('---', 1)]
+              keys = {line.split(':', 1)[0].strip() for line in front if ':' in line}
+              missing = {'name', 'description'} - keys
+              if missing:
+                  print(f"{skill}: missing {', '.join(sorted(missing))}")
+                  failed = True
+              else:
+                  print(f"ok  {skill}")
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: Compile hook scripts
+        run: |
+          find plugins -name '*.py' -print -exec python3 -m py_compile {} +
