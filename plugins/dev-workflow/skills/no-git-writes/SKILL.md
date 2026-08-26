@@ -1,6 +1,6 @@
 ---
 name: no-git-writes
-description: Explains why git write commands (commit, push, tag, merge, rebase, reset) are blocked in this setup and what to do instead.
+description: Explains that a PreToolUse hook blocks every git write command — commit, push, tag, merge, rebase, reset --hard, checkout -B, branch -D — because the developer owns what enters history, and describes the hand-over to write instead of a workaround. Use when about to commit, push, or tag, when a git command has just been denied by a hook, or when the user asks why Claude cannot commit.
 ---
 
 **The developer runs all git write commands themselves.** This is a deliberate policy, not a

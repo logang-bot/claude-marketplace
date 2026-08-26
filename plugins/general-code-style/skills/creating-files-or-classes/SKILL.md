@@ -1,6 +1,6 @@
 ---
 name: creating-files-or-classes
-description: When creating files or classes follow the instructions explained here
+description: Caps source files at ~200 lines, splits oversized files into focused child classes, and requires class and file names that describe their single purpose without a comment. Use when creating a new file or class, splitting a file that has grown too large, or naming either.
 ---
 
 When creating any file or class, always take into account these guidelines:

@@ -1,7 +1,7 @@
 ---
 name: new-screen
-description: Scaffold a Compose screen, its ViewModel, route registration, and light/dark previews
-argument-hint: <ScreenName> [feature-package]
+description: Scaffolds a Compose screen, its ViewModel, route registration, and light/dark previews, matching the conventions of existing screens in the project. Use when adding a new screen to an Android app.
+argument-hint: "<ScreenName> [feature-package]"
 ---
 
 Scaffold a new Compose screen named `$1`, in feature package `$2` if given, otherwise inferred

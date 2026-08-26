@@ -1,6 +1,6 @@
 ---
-name: writing-a-string-variable-or-text-in-a-code-file
-description: When writing user-facing strings or text in Kotlin or Android resource files — routes them to strings.xml instead of hardcoding
+name: writing-user-facing-strings
+description: Routes user-facing text into strings.xml and reads it back with stringResource in composables or context.getString elsewhere, never hardcoded in Kotlin. Exempts exception messages, log output, and technical identifiers such as keys, tags, and route names. Use when adding or editing any user-visible label, button text, title, message, content description, placeholder, or error text.
 paths: "**/*.kt,**/*.xml"
 ---
 

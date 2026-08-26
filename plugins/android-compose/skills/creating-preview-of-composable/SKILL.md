@@ -1,6 +1,6 @@
 ---
 name: creating-preview-of-composable
-description: When creating a preview for a composable take into account the guidelines described here
+description: Requires Compose @Preview functions to live in the same file as the composable they preview, to come in light and dark uiMode pairs, and to be named <ComposableName>Preview and <ComposableName>DarkPreview. Use when adding or editing a @Preview, or when a newly written composable still has none.
 paths: "**/*.kt"
 ---
 

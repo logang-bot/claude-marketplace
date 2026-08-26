@@ -1,7 +1,7 @@
 ---
 name: ship
-description: Prepare a release — distill the unreleased scratchpad into a new changelog section and bump the version
-argument-hint: <version>
+description: Prepares a release — distills the unreleased scratchpad into one new customer-facing changelog section and sets the project's version constant. Use when cutting a release or bumping a version.
+argument-hint: "<version>"
 ---
 
 Prepare the release for version `$1`. If `$1` is empty, ask for the version rather than

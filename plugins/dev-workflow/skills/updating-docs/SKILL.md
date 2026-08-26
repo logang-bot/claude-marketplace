@@ -1,6 +1,6 @@
 ---
 name: updating-docs
-description: When a code change is complete and the project has a docs/ directory — every change ends with a documentation update, including sweeping sibling docs for claims the change made stale.
+description: Ends a change by updating the doc that covers what changed, then sweeping sibling docs for claims the change made stale — descriptions, schema and dependency versions, counts, limits, and defaults quoted in prose. Use after completing a code change that alters behaviour, an interface, or an operational procedure in a project that has a docs/ directory.
 ---
 
 A change is not finished when the code works. It is finished when the documentation matches

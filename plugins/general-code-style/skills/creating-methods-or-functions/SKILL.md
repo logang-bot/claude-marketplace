@@ -1,6 +1,6 @@
 ---
 name: creating-methods-or-functions
-description: When creating new methods or functions follow the guidelines described here
+description: Limits function and method bodies to ~7 lines and 3 parameters (extras grouped into a data class, record, or struct), requires intent-revealing names, and bans explanatory inline comments in favour of doc comments on non-obvious math only. Use when writing or refactoring a function or method, adding a parameter, or commenting inside a body. UI component functions such as Compose composables, React components, and SwiftUI views are exempt from the size limits.
 ---
 
 When creating a method or function, take into consideration these guidelines:

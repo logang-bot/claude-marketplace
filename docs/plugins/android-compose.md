@@ -12,8 +12,8 @@ silent in a repo with no Kotlin — but there is no reason to carry it where it 
 |---|---|---|
 | Skill | `creating-composables` | `**/*.kt` — writing a `@Composable` function |
 | Skill | `creating-preview-of-composable` | `**/*.kt` — writing a preview |
-| Skill | `creating-or-update-new-screen-routes` | `**/*.kt` — touching a navigation graph |
-| Skill | `writing-a-string-variable-or-text-in-a-code-file` | `**/*.kt`, `**/*.xml` — writing user-facing text |
+| Skill | `creating-or-updating-screen-routes` | `**/*.kt` — touching a navigation graph |
+| Skill | `writing-user-facing-strings` | `**/*.kt`, `**/*.xml` — writing user-facing text |
 | Skill | `identifying-use-cases` | `**/*.kt` — deciding where logic belongs |
 | Agent | `android-architecture-reviewer` | Asked to review layering |
 | Command | `/new-screen <Name> [package]` | Run explicitly |

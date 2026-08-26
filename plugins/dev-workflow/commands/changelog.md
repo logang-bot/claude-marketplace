@@ -1,7 +1,7 @@
 ---
 name: changelog
-description: Append a user-facing change to the unreleased changelog scratchpad
-argument-hint: <what changed>
+description: Appends a user-facing change as a bullet to the pending section of CHANGELOG.unreleased.md, proposing one from the working tree when given no argument. Use when recording a change that shipped behaviour a user can notice.
+argument-hint: "<what changed>"
 ---
 
 Append `$ARGUMENTS` as a bullet to the pending section of `CHANGELOG.unreleased.md`. If this

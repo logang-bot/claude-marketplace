@@ -30,16 +30,27 @@ Only a few matter in practice, and they differ by component type.
 ```yaml
 ---
 name: identifying-use-cases
-description: When deciding whether a piece of logic in a ViewModel or Repository belongs in a UseCase instead
+description: Decides whether logic belongs in a UseCase rather than a ViewModel or Repository — coordinating multiple repositories, enforcing a domain rule, cascading writes. Use when adding business logic to a ViewModel or Repository, or creating a new UseCase.
 paths: "**/*.kt"
 ---
 ```
 
 - `name` **must equal the directory name.** CI enforces this; a rename that updates only one of
   the two makes the skill silently vanish.
-- `description` is the whole activation mechanism — it is what gets matched against the work at
-  hand. Write it as *when* to use the skill, not what it contains. "When creating a new function
-  marked as composable" activates; "Composable guidelines" does not.
+- `description` is the whole activation mechanism. At startup only `name` and `description` are
+  pre-loaded; the body is read *after* the skill has already been selected, so anything the
+  description omits cannot influence whether the skill fires. Write it as **what the skill does
+  and when to use it**, in **third person**, with the concrete terms a matching task would
+  contain — `@Composable`, `strings.xml`, `CHANGELOG.unreleased.md`. Max 1,024 characters.
+  "Follow the guidelines described here" is the anti-pattern: it is pure filler, and it is what
+  every skill in this repo said before the descriptions were rewritten.
+- **Quote the description only when YAML needs it** — when it contains `: `, contains ` #`, or
+  *starts with* one of `@ \` & * ! | > % - ? { } [ ] , " '`. Those characters are harmless
+  mid-string, so `@Composable` inside a sentence needs no quotes. The same rule applies to
+  `argument-hint`, and there it usually does bite: `[path] [--sweep]` unquoted is two flow
+  sequences on one line, which silently invalidates the whole frontmatter block.
+- `name` must be lowercase letters, digits, and hyphens, at most 64 characters. Prefer gerund
+  form (`creating-composables`, `identifying-use-cases`) over vague or overlong alternatives.
 - `paths` is optional gating, see below.
 
 ### <a id="paths-gating"></a>`paths` gating
@@ -59,8 +70,8 @@ language-agnostic ones in `general-code-style` and the process ones in `dev-work
 ```yaml
 ---
 name: ship
-description: Prepare a release — distill the unreleased scratchpad into a new changelog section
-argument-hint: <version>
+description: Prepares a release — distills the unreleased scratchpad into one new customer-facing changelog section and sets the project's version constant. Use when cutting a release or bumping a version.
+argument-hint: "<version>"
 ---
 ```
 
@@ -76,7 +87,7 @@ guessing.
 ```yaml
 ---
 name: style-reviewer
-description: Reviews code against file-size, function-size, parameter-count, and naming conventions. Read-only.
+description: Reviews code against file-size, function-size, parameter-count, and naming conventions. Use when asked to check style compliance, or after a batch of new files or functions has been written. Read-only — reports findings, never edits.
 tools: Read, Grep, Glob, Bash
 model: inherit
 ---
@@ -99,19 +110,24 @@ rule — as the composables skill does with the UI-component exemption.
 Every skill in this repo fits on one screen except `identifying-use-cases`, which earns its
 length with worked code.
 
-**The `description` is the trigger, not documentation.** It is what a model matches against to
-decide whether to invoke something, so its grammar decides whether the component fires on its
-own:
+**Every `description` states what it does *and* when to use it.** Both halves, always, for
+skills, commands, and agents alike — this follows [Anthropic's skill authoring best
+practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
+The *what* carries the terms a task will actually contain; the *when* tells the model the
+moment has arrived. Drop either half and discovery degrades:
 
-- **State a condition** — "When creating a method…", "Use after changing a route" — and it will
-  be invoked automatically. Nine of the ten skills here and both agents are written this way.
-- **State what it does** — "Prepare a release…", "Review code against…" — and it will not, in
-  practice, because nothing tells the model when the moment has arrived. All five commands here
-  are written this way.
+- **What only** — "Explains why git write commands are blocked" — never loads at the moment
+  Claude is about to commit, which is the only moment it matters.
+- **When only** — "When creating files or classes, follow the instructions explained here" —
+  matches nothing specific, because the 200-line cap and the naming rule never reach the matcher.
+- **Both** — "Caps source files at ~200 lines … Use when creating a new file or class, splitting
+  a file that has grown too large, or naming either."
 
-That is the real difference between a command and a skill, not the directory they live in.
-Commands are also reachable in plain English through this same matching, so a command's
-description is a user-facing surface even though you invoke it with a slash.
+**Grammar does not control model invocation.** A *what*-only description is not a way to keep a
+command user-triggered; it only makes the command harder to find. The field that actually gates
+it is `disable-model-invocation: true`, which nothing in this repo sets — so every command here
+is reachable both by `/name` and by description matching, and its description is a user-facing
+surface either way.
 
 **Know what runs in whose context.** Skills and commands both expand into the *current*
 conversation — they see everything already in the session. Only an agent gets a fresh context.

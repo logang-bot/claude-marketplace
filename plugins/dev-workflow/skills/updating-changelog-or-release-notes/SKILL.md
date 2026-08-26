@@ -1,6 +1,6 @@
 ---
 name: updating-changelog-or-release-notes
-description: When adding a changelog entry, recording a user-facing change, bumping the version, or preparing a release — always read the unreleased scratchpad first.
+description: Two-file changelog discipline — append developer-facing bullets to CHANGELOG.unreleased.md as changes land, and only at release time distill them into one customer-facing version section in CHANGELOG.md whose header matches the project's version constant. Use when a user-facing change lands, when adding a changelog entry or release note, when bumping the version, or when preparing a release.
 ---
 
 This plugin assumes **two changelog files** with different audiences. Create them in this

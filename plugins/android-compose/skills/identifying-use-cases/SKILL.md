@@ -1,6 +1,6 @@
 ---
 name: identifying-use-cases
-description: When deciding whether a piece of logic in a ViewModel or Repository belongs in a UseCase instead
+description: Decides whether logic belongs in a UseCase rather than a ViewModel or Repository — coordinating multiple repositories, enforcing a domain rule, logic duplicated across ViewModels, cascading writes, domain-level calculations — and gives the <Verb><Noun>UseCase naming convention with worked Kotlin examples. Use when adding business logic to a ViewModel or Repository, creating a new UseCase, or refactoring a ViewModel that has accumulated domain logic.
 paths: "**/*.kt"
 ---
 

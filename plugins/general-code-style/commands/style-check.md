@@ -1,7 +1,7 @@
 ---
 name: style-check
-description: Review code against the file, function, parameter, naming, and comment style rules
-argument-hint: [path] [--sweep]
+description: Reviews code against the file-size, function-size, parameter-count, naming, and comment rules, in agent mode for a diff or small path and mechanical sweep mode for a large tree. Use when asked to check style compliance or audit a codebase against these conventions.
+argument-hint: "[path] [--sweep]"
 ---
 
 Check `$ARGUMENTS` against the style rules. Pick the mode from the size of what you are

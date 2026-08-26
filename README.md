@@ -61,8 +61,8 @@ Kotlin or Android resource files are in play.
 |---|---|---|
 | Skill | `creating-composables` | `Modifier` first optional param, split into children, no business logic |
 | Skill | `creating-preview-of-composable` | Previews in the same file, light + dark variants |
-| Skill | `creating-or-update-new-screen-routes` | Screens own their ViewModels; nav passes primitives only |
-| Skill | `writing-a-string-variable-or-text-in-a-code-file` | User-facing text goes to `strings.xml` |
+| Skill | `creating-or-updating-screen-routes` | Screens own their ViewModels; nav passes primitives only |
+| Skill | `writing-user-facing-strings` | User-facing text goes to `strings.xml` |
 | Skill | `identifying-use-cases` | When logic belongs in a UseCase rather than a ViewModel |
 | Agent | `android-architecture-reviewer` | Read-only layering review |
 | Command | `/new-screen <Name>` | Scaffolds screen, ViewModel, route, and previews |

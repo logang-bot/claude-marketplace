@@ -1,7 +1,7 @@
 ---
 name: extract-strings
-description: Move hardcoded user-facing strings into strings.xml and rewrite the call sites
-argument-hint: [path]
+description: Moves hardcoded user-facing string literals out of Kotlin into strings.xml and rewrites the call sites to stringResource or context.getString. Use when asked to extract, externalise, or localise hardcoded UI strings.
+argument-hint: "[path]"
 ---
 
 Find hardcoded user-facing string literals in `$ARGUMENTS` (or, if empty, in the Kotlin files

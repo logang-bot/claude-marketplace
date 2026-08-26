@@ -1,6 +1,6 @@
 ---
-name: creating-or-update-new-screen-routes
-description: When creating or updating screen routes in any navigation composable
+name: creating-or-updating-screen-routes
+description: Keeps Compose navigation graphs thin — each screen creates its own ViewModels, the route passes only primitive arguments such as IDs and flags, and LaunchedEffect and remember stay inside the screen composable. Use when adding or editing a route, working in a NavHost or navigation composable, or wiring a screen into navigation.
 paths: "**/*.kt"
 ---
 
