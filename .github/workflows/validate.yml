@@ -64,6 +64,59 @@ jobs:
           sys.exit(1 if failed else 0)
           PY
 
+      - name: Check skill directory names match frontmatter
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys
+          failed = False
+          for skill in pathlib.Path('plugins').glob('*/skills/*/SKILL.md'):
+              lines = skill.read_text().split('\n')
+              front = lines[1:lines.index('---', 1)]
+              name = next((l.split(':', 1)[1].strip() for l in front
+                           if l.split(':', 1)[0].strip() == 'name'), None)
+              if name != skill.parent.name:
+                  print(f"{skill}: frontmatter name {name!r} != directory {skill.parent.name!r}")
+                  failed = True
+              else:
+                  print(f"ok  {skill.parent.name}")
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: Check command and agent frontmatter
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys
+          failed = False
+          targets = list(pathlib.Path('plugins').glob('*/commands/*.md'))
+          targets += list(pathlib.Path('plugins').glob('*/agents/*.md'))
+          for doc in targets:
+              lines = doc.read_text().split('\n')
+              if lines[0] != '---' or '---' not in lines[1:]:
+                  print(f"{doc}: missing frontmatter")
+                  failed = True
+                  continue
+              front = lines[1:lines.index('---', 1)]
+              keys = {l.split(':', 1)[0].strip() for l in front if ':' in l}
+              if 'description' not in keys:
+                  print(f"{doc}: missing description")
+                  failed = True
+              else:
+                  print(f"ok  {doc}")
+          sys.exit(1 if failed else 0)
+          PY
+
       - name: Compile hook scripts
         run: |
           find plugins -name '*.py' -print -exec python3 -m py_compile {} +
+
+      - name: Check for project-specific leakage
+        run: |
+          # Scoped to shipped plugin content. docs/ and .github/ are excluded on purpose:
+          # they document these patterns, so they legitimately contain the words.
+          if grep -rniE 'restrusher|in this project we|domain/usecase/' \
+               --include='*.md' --include='*.json' --include='*.py' \
+               .claude-plugin plugins README.md; then
+            echo "found a reference that ties a plugin to one project or the old owner"
+            exit 1
+          fi
+          echo "ok  no project-specific references"

@@ -2,7 +2,7 @@
   "name": "dev-workflow",
   "description": "Release and documentation workflow: changelog discipline, docs upkeep, and git write protection.",
   "version": "0.1.0",
-  "author": { "name": "restrusher" },
+  "author": { "name": "logang-bot" },
   "repository": "https://github.com/logang-bot/claude-marketplace",
   "license": "MIT"
 }

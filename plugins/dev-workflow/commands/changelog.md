@@ -4,7 +4,8 @@ description: Append a user-facing change to the unreleased changelog scratchpad
 argument-hint: <what changed>
 ---
 
-Append `$ARGUMENTS` as a bullet to the pending section of `CHANGELOG.unreleased.md`.
+Append `$ARGUMENTS` as a bullet to the pending section of `CHANGELOG.unreleased.md`. If this
+project names its changelog files differently, find them first rather than assuming.
 
 If `$ARGUMENTS` is empty, look at the uncommitted working tree (`git diff`, plus untracked
 files) and propose a bullet describing what changed, for the user to confirm before you write

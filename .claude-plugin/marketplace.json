@@ -11,7 +11,7 @@
       "name": "general-code-style",
       "description": "Language-agnostic style rules for file, class, and function size, parameter counts, and self-describing names. Ships a style reviewer agent and a size-check hook.",
       "author": {
-        "name": "restrusher"
+        "name": "logang-bot"
       },
       "category": "productivity",
       "keywords": [
@@ -25,7 +25,7 @@
       "name": "android-compose",
       "description": "Android, Kotlin, and Jetpack Compose conventions: composable structure, previews, navigation routes, string resources, and clean-architecture use cases.",
       "author": {
-        "name": "restrusher"
+        "name": "logang-bot"
       },
       "category": "development",
       "keywords": [
@@ -40,7 +40,7 @@
       "name": "dev-workflow",
       "description": "Release and documentation workflow: two-file changelog discipline, docs upkeep, and a hook that keeps git write commands in the developer's hands.",
       "author": {
-        "name": "restrusher"
+        "name": "logang-bot"
       },
       "category": "workflow",
       "keywords": [

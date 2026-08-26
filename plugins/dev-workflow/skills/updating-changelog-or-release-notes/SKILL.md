@@ -3,7 +3,8 @@ name: updating-changelog-or-release-notes
 description: When adding a changelog entry, recording a user-facing change, bumping the version, or preparing a release — always read the unreleased scratchpad first.
 ---
 
-This project keeps **two changelog files** with different audiences:
+This plugin assumes **two changelog files** with different audiences. Create them in this
+shape if the project has only one, or none:
 
 - **`CHANGELOG.unreleased.md`** — a developer-facing scratchpad of changes that have landed
   but are not yet shipped. Appended to continuously, during normal development.
@@ -15,7 +16,10 @@ split of roles.
 
 ## Read the project's own settings first
 
-Before writing release notes, read the project's `CLAUDE.md` for:
+Before writing release notes, find where this project documents its release process. Look in
+this order: the project's `CLAUDE.md`, then a release or shipping document under `docs/`, then
+the header of the changelog files themselves — many projects document their own conventions
+there. You need four things:
 
 - **where the version constant lives** (the build file, a manifest, a package file) — the
   release pipeline usually requires the changelog section header to match it exactly
@@ -25,8 +29,8 @@ Before writing release notes, read the project's `CLAUDE.md` for:
 - **pre-release steps** — migrations, functions, or services that must be deployed before the
   release goes out
 
-If `CLAUDE.md` does not say, ask rather than guessing. Getting the version header wrong
-typically fails the release build.
+If none of those say, ask rather than guessing. Getting the version header wrong typically
+fails the release build.
 
 ## When a user-facing change lands (normal development)
 
@@ -40,10 +44,10 @@ Skip changes with no user or security impact: internal refactors, docs, tests, t
 ## When preparing a release
 
 1. **Read `CHANGELOG.unreleased.md`** — it holds everything to announce.
-2. Decide the new version and set the version constant where `CLAUDE.md` says it lives.
+2. Decide the new version and set the version constant where the project's docs say it lives.
 3. **Distill all pending bullets into ONE new `## [VERSION]` section** at the top of the
    version list in `CHANGELOG.md`, following that file's established house style:
-   - Written for the reader `CLAUDE.md` names, in the language that file already uses.
+   - Written for the reader those docs name, in the language the changelog already uses.
    - Short phrases describing **what changes for the person using the software** — never file
      names, class names, or technical internals.
    - The section header **must exactly match** the version constant.
@@ -57,6 +61,6 @@ Skip changes with no user or security impact: internal refactors, docs, tests, t
 
 - **Do not run git commands** — no commit, tag, or push. Stop after the file edits and tell
   the user the version and tag to push. See `no-git-writes`.
-- Before a production release, remind the user of any pre-release deployment steps
-  `CLAUDE.md` lists. Skipping them typically breaks the shipped build at runtime, not at
+- Before a production release, remind the user of any pre-release deployment steps the
+  project documents. Skipping them typically breaks the shipped build at runtime, not at
   build time, so it fails silently until a user hits it.

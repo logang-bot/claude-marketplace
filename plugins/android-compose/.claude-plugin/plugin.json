@@ -2,7 +2,7 @@
   "name": "android-compose",
   "description": "Android, Kotlin, and Jetpack Compose conventions: composables, previews, navigation routes, string resources, and use cases.",
   "version": "0.1.0",
-  "author": { "name": "restrusher" },
+  "author": { "name": "logang-bot" },
   "repository": "https://github.com/logang-bot/claude-marketplace",
   "license": "MIT"
 }

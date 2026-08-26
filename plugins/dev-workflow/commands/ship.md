@@ -9,11 +9,14 @@ inferring one.
 
 Follow the `updating-changelog-or-release-notes` skill. In order:
 
-1. **Read the project's `CLAUDE.md`** for where the version constant lives, the language and
-   audience of the release notes, any length cap, and any pre-release deployment steps. If it
-   does not say, ask — a mismatched version header usually fails the release build.
-2. **Read `CHANGELOG.unreleased.md`** in full. It holds everything to announce.
-3. **Set the version constant** to `$1` where `CLAUDE.md` says it lives.
+1. **Find where this project documents its release process** — look in its `CLAUDE.md`, then a
+   release or shipping document under `docs/`, then the headers of the changelog files
+   themselves. You need where the version constant lives, the language and audience of the
+   release notes, any length cap, and any pre-release deployment steps. If none of them say,
+   ask — a mismatched version header usually fails the release build.
+2. **Read `CHANGELOG.unreleased.md`** in full. It holds everything to announce. If this project
+   names its changelog files differently, find them first rather than assuming.
+3. **Set the version constant** to `$1` where those docs say it lives.
 4. **Write one new `## [$1]` section** at the top of the version list in `CHANGELOG.md`,
    distilled from the pending bullets: what changes for the person using the software, in
    that file's existing language and house style, within any length cap. Never file or class
@@ -25,7 +28,7 @@ Then **stop**. Do not run git — no commit, no tag, no push. Print for the user
 
 - the version and the exact tag to push
 - the commit message you would have used
-- any pre-release deployment steps `CLAUDE.md` lists, called out as blocking
+- any pre-release deployment steps the project documents, called out as blocking
 
 Report the character count of the new section if the project has a cap, so the user can see
 it fits.

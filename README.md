@@ -12,27 +12,26 @@ plugins so they travel between projects instead of living in one repo's `.claude
 /plugin install dev-workflow@logang-bot
 ```
 
-The marketplace is named `restrusher` while the repo is hosted under `logang-bot`, so the
-`add` line uses the repo path and the `@logang-bot` suffix is the marketplace identity. They
-are separate on purpose; both are correct as written.
-
 To enable them automatically for everyone working in a project, commit this to the project's
 `.claude/settings.json`:
 
 ```json
 {
   "extraKnownMarketplaces": {
-    "restrusher": {
+    "logang-bot": {
       "source": { "source": "github", "repo": "logang-bot/claude-marketplace" }
     }
   },
   "enabledPlugins": {
-    "general-code-style@logang-bot": { "enabled": true },
-    "android-compose@logang-bot": { "enabled": true },
-    "dev-workflow@logang-bot": { "enabled": true }
+    "general-code-style@logang-bot": true,
+    "android-compose@logang-bot": true,
+    "dev-workflow@logang-bot": true
   }
 }
 ```
+
+The key under `extraKnownMarketplaces` and the `@`-suffix on each plugin id are the same thing —
+the marketplace name from `.claude-plugin/marketplace.json`. They must match.
 
 ## Plugins
 
@@ -73,7 +72,7 @@ Process rules. Platform-agnostic.
 
 | Component | Name | What it does |
 |---|---|---|
-| Skill | `updating-changelog-or-release-notes` | Two-file changelog discipline; reads project `CLAUDE.md` for specifics |
+| Skill | `updating-changelog-or-release-notes` | Two-file changelog discipline; looks up the project's own release specifics |
 | Skill | `updating-docs` | Every behaviour change ends with a docs update and a stale-claim sweep |
 | Skill | `no-git-writes` | Why git writes are blocked and what to do instead |
 | Command | `/changelog <text>` | Appends a bullet to the unreleased scratchpad |
@@ -81,9 +80,11 @@ Process rules. Platform-agnostic.
 | Hook | `PreToolUse` | Denies `git commit`/`push`/`tag`/`rebase` and publishing `gh` subcommands |
 | Hook | `Stop` | Reminds when code changed but nothing in `docs/` did |
 
-The changelog skill deliberately carries no project specifics. It reads the project's
-`CLAUDE.md` for the version-constant location, the release-notes language, any length cap, and
-pre-release deployment steps. A project using this plugin should document those four things.
+The changelog skill deliberately carries no project specifics. It looks up four things at
+release time — the version-constant location, the release-notes language and audience, any
+length cap, and pre-release deployment steps — searching the project's `CLAUDE.md`, then a
+release document under `docs/`, then the changelog files' own headers. A project using this
+plugin should document those four things in one of those places.
 
 ## Adding a platform plugin
 
@@ -104,17 +105,35 @@ per platform.
 ```bash
 # Validate every plugin
 for p in plugins/*/; do claude plugin validate "$p" --strict; done
+```
 
-# Install from a local checkout, without pushing
+Edits here are not live until they are pushed, because a project's `.claude/settings.json`
+resolves the marketplace from GitHub. To test a change before pushing it, point Claude at this
+checkout instead:
+
+```
 /plugin marketplace add /path/to/claude-marketplace
-
-# Reload after editing, without restarting the session
 /reload-plugins
 ```
+
+`/reload-plugins` picks up further edits without restarting the session. This repo's own
+`.claude/settings.json` is gitignored so it can hold whichever of the two you are using.
 
 Hook scripts are Python 3 with no third-party dependencies. They read the hook payload on
 stdin and exit 2 to surface a message; every one exits 0 on malformed input, a missing file,
 or a non-git directory, so a broken hook degrades to silence rather than blocking work.
+
+## Documentation
+
+Deeper reference lives in [`docs/`](docs/):
+
+| Page | Covers |
+|---|---|
+| [`docs/plugins/`](docs/plugins/) | One page per plugin — every skill, command, agent, and hook |
+| [`docs/architecture.md`](docs/architecture.md) | Discovery chain, consumer settings, install pinning and updates |
+| [`docs/authoring.md`](docs/authoring.md) | Frontmatter reference and how to add a component |
+| [`docs/hooks.md`](docs/hooks.md) | The three hooks, the exit-code contract, how to test one |
+| [`docs/testing-and-ci.md`](docs/testing-and-ci.md) | Local checks, what `validate.yml` covers, release steps |
 
 ## License
 
