@@ -17,14 +17,19 @@ Only review files that actually contain code.
 ## The rules
 
 1. **File length** — over ~200 non-import lines is a finding; over 250 is a firm one.
-2. **Function length** — a body over ~10 lines is a finding; over 15 is a firm one.
+2. **Function length** — a body over ~7 lines is a finding; over 10 is a firm one.
 3. **Parameter count** — more than three parameters is a finding, unless the extras are
    already grouped into a single coherent type.
 4. **Name self-descriptiveness** — a file, class, or function whose purpose is not clear from
    its name, or that needs a comment to explain what it does.
+5. **Comments** — an explanatory comment inside a function body is a finding, as is a doc
+   comment on a member whose name already says it. Tool directives (`// noinspection`,
+   `// eslint-disable-next-line`, `#pragma`), `TODO`/`FIXME` markers, licence headers, and doc
+   comments on genuinely non-obvious math or algorithms are not findings.
 
 **Exempt from rules 2 and 3:** UI component functions (Compose composables, React components,
-SwiftUI views). Note them as exempt rather than reporting them.
+SwiftUI views). Note them as exempt rather than reporting them. The exemption covers those two
+rules only — rule 5 still applies to them.
 
 ## How to report
 
@@ -33,5 +38,6 @@ limit, and the concrete split or grouping you would suggest. Order files by seve
 
 Report the measurement, not an impression — say "148-line body" rather than "quite long". If
 nothing violates the rules, say so in one line; do not manufacture findings to fill a report.
-Rules 1-3 are mechanical, so be firm on them. Rule 4 is a judgement call: raise it only when
-you can name what the reader would actually misunderstand.
+Rules 1-3 are mechanical, so be firm on them. Rules 4 and 5 are judgement calls: raise them
+only when you can name what the reader would actually misunderstand, or — for rule 5 — the
+rename or extraction that would remove the need for the comment.

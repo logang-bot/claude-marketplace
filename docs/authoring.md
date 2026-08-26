@@ -99,6 +99,26 @@ rule — as the composables skill does with the UI-component exemption.
 Every skill in this repo fits on one screen except `identifying-use-cases`, which earns its
 length with worked code.
 
+**The `description` is the trigger, not documentation.** It is what a model matches against to
+decide whether to invoke something, so its grammar decides whether the component fires on its
+own:
+
+- **State a condition** — "When creating a method…", "Use after changing a route" — and it will
+  be invoked automatically. Nine of the ten skills here and both agents are written this way.
+- **State what it does** — "Prepare a release…", "Review code against…" — and it will not, in
+  practice, because nothing tells the model when the moment has arrived. All five commands here
+  are written this way.
+
+That is the real difference between a command and a skill, not the directory they live in.
+Commands are also reachable in plain English through this same matching, so a command's
+description is a user-facing surface even though you invoke it with a slash.
+
+**Know what runs in whose context.** Skills and commands both expand into the *current*
+conversation — they see everything already in the session. Only an agent gets a fresh context.
+A skill shapes work already underway and is usually meaningless invoked alone; a command brings
+its own occasion, which is why only commands take arguments (`$1`, `$ARGUMENTS`) and why every
+command here handles the empty case by asking or falling back to the working tree.
+
 **Never assert the consuming project's structure.** Say "find an existing `*UseCase.kt` and match
 its package" rather than "use cases live in `domain/usecase/`". The CI leakage step greps for the
 phrases that mark this mistake. Examples are fine — assertions are not.

@@ -144,16 +144,27 @@ The write has already succeeded — the wording makes clear this is advice, not 
 | Constant | Value | Meaning |
 |---|---|---|
 | `FILE_LIMIT` | 250 | 200 target + 50 spare, excluding import and `package` lines |
-| `FUNCTION_LIMIT` | 15 | 10 target + 5 spare, body lines only |
+| `FUNCTION_LIMIT` | 10 | 7 target + 3 spare, body code lines only |
+| `PARAM_LIMIT` | 3 | Parameters per declaration before the extras must be grouped into a type |
+| `DECL_SPAN` | 12 | Lines a wrapped parameter list may span before it is given up on |
 
-File length is measured for any file type. Function length only for `BRACE_LANGS`, and only the
-longest top-level function is reported. UI component functions are exempt, detected by scanning
-the four lines above a declaration for `UI_MARKERS` — see
+File length is measured for any file type. Function length and parameter count only for
+`BRACE_LANGS`, and only the worst offender of each kind is reported — a file raises at most one
+length warning and one parameter warning. Body length counts code lines only: blank lines and
+lines opening with `//`, `#`, `*`, or `/*` do not count, so a doc comment never eats into the
+budget. UI component functions are exempt from both rules, detected by scanning the four lines
+above a declaration for `UI_MARKERS` — see
 [plugins/general-code-style.md](plugins/general-code-style.md#the-ui-component-exemption) for the
 declaration-matching details.
 
 Note that `MultiEdit` and `NotebookEdit` are not in the matcher, so writes through those paths
 are unmeasured.
+
+This script is also imported as a module by `general-code-style/scripts/sweep.py`, which reuses
+its constants and its `measure_file` / `iter_functions` functions to measure a whole tree. Treat
+the constants and those two function signatures as a public surface: changing them changes the
+sweep too, which is the point — it is what stops the two from disagreeing about a cap. The hook
+reduces `iter_functions` to the worst offender per file; the sweep consumes all of it.
 
 ---
 

@@ -42,13 +42,15 @@ Language-agnostic. Install everywhere.
 | Component | Name | What it does |
 |---|---|---|
 | Skill | `creating-files-or-classes` | ~200-line file cap, split when approaching it, self-describing names |
-| Skill | `creating-methods-or-functions` | ~10-line bodies, max 3 parameters, intent-revealing names |
-| Agent | `style-reviewer` | Read-only review against the size, parameter, and naming rules |
-| Command | `/style-check [path]` | Runs the reviewer over a path or the uncommitted diff |
-| Hook | `PostToolUse` | Warns when a written file or function exceeds the caps |
+| Skill | `creating-methods-or-functions` | ~7-line bodies, max 3 parameters, intent-revealing names, no explanatory comments |
+| Agent | `style-reviewer` | Read-only review against the size, parameter, naming, and comment rules |
+| Command | `/style-check [path] [--sweep]` | Reviews a diff or small path with the agent; sweeps a large one mechanically |
+| Script | `scripts/sweep.py` | Measures a whole tree against the size rules, no model involved |
+| Hook | `PostToolUse` | Warns when a written file or function exceeds the caps, or takes too many parameters |
 
 UI component functions (Compose composables, React components, SwiftUI views) are exempt from
-the body-length and parameter rules, in both the skill and the hook.
+the body-length and parameter rules — and from those two only — in both the skill and the hook.
+The comment rules apply everywhere.
 
 ### `android-compose`
 

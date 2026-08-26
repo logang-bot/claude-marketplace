@@ -90,7 +90,6 @@ storage to be one — this takes data in and returns a domain verdict:
 ```kotlin
 class CalcularEstadoClienteUseCase @Inject constructor() {
 
-    /** @param now overridable so the age rule can be tested exactly; callers take the default. */
     operator fun invoke(
         pedidos: List<Pedido>,
         umbrales: Umbrales,
@@ -112,8 +111,10 @@ class CalcularEstadoClienteUseCase @Inject constructor() {
 }
 ```
 
-Note how the private helpers keep `invoke` readable — the same function-size rule the
-`general-code-style` plugin applies everywhere else.
+Note how the private helpers keep `invoke` readable, and how nothing in it needs a comment —
+the same function-size and no-explanatory-comments rules the `general-code-style` plugin applies
+everywhere else. `now` carries a default so tests can pin the clock; the name says that, so no
+`@param` is written for it.
 
 The DI annotation depends on the project's framework — these use Hilt's `@Inject constructor`.
 Match whatever the existing use cases in the project already use.
