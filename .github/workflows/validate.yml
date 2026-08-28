@@ -109,6 +109,15 @@ jobs:
         run: |
           find plugins -name '*.py' -print -exec python3 -m py_compile {} +
 
+      - name: Run the hook tests
+        run: |
+          # py_compile proves these parse. This proves they still do what they claim to, which
+          # matters because hooks fail open — a guard that stops guarding is silent.
+          for suite in plugins/*/tests/test_*.py; do
+            echo "== $suite"
+            python3 "$suite"
+          done
+
       - name: Check for project-specific leakage
         run: |
           # Scoped to shipped plugin content. docs/ and .github/ are excluded on purpose:

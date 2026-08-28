@@ -16,19 +16,29 @@ GIT_CALL = re.compile(
     r'(?:(?:-[cC]\s+\S+|--(?:git-dir|work-tree|namespace|exec-path)(?:=\S*|\s+\S+)|-\S+)\s+)*'
     r'([\w-]+)\b(.*)$'
 )
+SEGMENTS = re.compile(r'&&|\|\||;|\|')
+SHORT_FLAG_RUN = re.compile(r'-[a-zA-Z]+')
+
+DENIAL = (
+    'Blocked: `{violation}` — the developer runs all git write commands themselves.\n\n'
+    'This is policy, not a failure. Finish the file edits, then stop and tell the user '
+    'exactly what to run, including the commit message you would have used. Do not work '
+    'around this with gh, an alias, or a script. Read-only git commands (status, diff, '
+    'log, show) are allowed.'
+)
+
+
+def clusters_flag(token, flags):
+    """A run of short flags carries each one it clusters, so `-xdf` counts as `-f`."""
+    if not SHORT_FLAG_RUN.fullmatch(token):
+        return False
+    return any(len(flag) == 2 and flag[1].islower() and flag[1] in token[1:]
+               for flag in flags)
 
 
 def has_flag(rest, *flags):
     """True when `rest` carries one of `flags` as a real option, not as an argument value."""
-    for token in rest.split():
-        if token in flags:
-            return True
-        # Clustered short flags: `-xdf` carries `-f`.
-        if re.fullmatch(r'-[a-zA-Z]+', token):
-            for flag in flags:
-                if len(flag) == 2 and flag[1].islower() and flag[1] in token[1:]:
-                    return True
-    return False
+    return any(token in flags or clusters_flag(token, flags) for token in rest.split())
 
 
 def has_word(rest, *words):
@@ -63,45 +73,53 @@ GH_BLOCKED = [
 ]
 
 
+def gh_violation(segment):
+    return next((name for pattern, name in GH_BLOCKED if re.search(pattern, segment)), None)
+
+
+def blocked_by_rule(rule, rest):
+    return rule[1] if rule[0] is None or rule[0](rest) else None
+
+
+def git_violation(segment):
+    match = GIT_CALL.match(segment)
+    rule = BLOCKED.get(match.group(1)) if match else None
+    return blocked_by_rule(rule, match.group(2)) if rule else None
+
+
+def segment_violation(segment):
+    return gh_violation(segment) or git_violation(segment)
+
+
 def find_violation(command):
-    for segment in re.split(r'&&|\|\||;|\|', command):
-        segment = segment.strip()
-        for pattern, name in GH_BLOCKED:
-            if re.search(pattern, segment):
-                return name
-        match = GIT_CALL.match(segment)
-        if not match:
-            continue
-        subcommand, rest = match.group(1), match.group(2)
-        rule = BLOCKED.get(subcommand)
-        if rule and (rule[0] is None or rule[0](rest)):
-            return rule[1]
-    return None
+    """The name of the first blocked command among the segments, or None."""
+    segments = (segment.strip() for segment in SEGMENTS.split(command))
+    return next((found for found in map(segment_violation, segments) if found), None)
+
+
+def read_payload():
+    try:
+        return json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+def bash_command(payload):
+    """The command this payload runs, or empty when the call is not a Bash call."""
+    if payload.get('tool_name') != 'Bash':
+        return ''
+    return (payload.get('tool_input') or {}).get('command') or ''
+
+
+def deny(violation):
+    print(DENIAL.format(violation=violation), file=sys.stderr)
+    return 2
 
 
 def main():
-    try:
-        payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
-        return 0
-
-    if payload.get('tool_name') != 'Bash':
-        return 0
-
-    command = (payload.get('tool_input') or {}).get('command') or ''
-    violation = find_violation(command)
-    if not violation:
-        return 0
-
-    print(
-        f'Blocked: `{violation}` — the developer runs all git write commands themselves.\n\n'
-        f'This is policy, not a failure. Finish the file edits, then stop and tell the user '
-        f'exactly what to run, including the commit message you would have used. Do not work '
-        f'around this with gh, an alias, or a script. Read-only git commands (status, diff, '
-        f'log, show) are allowed.',
-        file=sys.stderr,
-    )
-    return 2
+    payload = read_payload()
+    violation = find_violation(bash_command(payload)) if payload else None
+    return deny(violation) if violation else 0
 
 
 if __name__ == '__main__':

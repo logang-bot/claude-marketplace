@@ -7,7 +7,12 @@
 for p in plugins/*/; do claude plugin validate "$p" --strict; done
 
 # Hooks at least parse
-python3 -m py_compile plugins/*/hooks/*.py
+python3 -m py_compile plugins/*/hooks/*.py plugins/*/hooks/*/*.py
+
+# Hook logic still does what it claims to
+python3 plugins/general-code-style/tests/test_style_rules.py
+python3 plugins/dev-workflow/tests/test_block_git_writes.py
+python3 plugins/dev-workflow/tests/test_docs_reminder.py
 
 # No plugin has been tied back to one project or the old owner
 grep -rniE 'restrusher|in this project we|domain/usecase/' \
@@ -42,9 +47,16 @@ the entire Bash command string, so a harness that writes `git commit` as an argu
 command containing `git commit`, and the installed hook blocks the test run. Building fixture
 strings by concatenation (`G = "g" + "it"`) keeps them inert.
 
-Always test both directions. The current suite is 24 must-block and 25 must-pass cases; the
-must-pass half is what caught the anchoring bug, where read-only commands like
-`git log --grep=commit` were being denied.
+Always test both directions. `plugins/dev-workflow/tests/test_block_git_writes.py` is 35
+must-block and 34 must-pass cases; the must-pass half is what caught the anchoring bug, where
+read-only commands like `git log --grep=commit` were being denied, and it is what made the
+guard safe to refactor. `test_docs_reminder.py` covers the reminder's file classification.
+
+`plugins/general-code-style/tests/test_style_rules.py` covers the size and comment measurements
+the same way, importing `hooks/style_rules/` directly. Its must-pass half is the load-bearing
+one: a comment check that flags `TODO`, a licence header, a `//` inside a URL, or a Python
+docstring would make the hook unusable noise, and a parameter counter that miscounts a trailing
+comma or a `Map<String, Int>` invents findings that are not there.
 
 ## What `validate.yml` checks
 
@@ -59,6 +71,7 @@ Runs on every push and pull request, on a fresh `ubuntu-latest` runner. Pure `ba
 | Check skill directory names match frontmatter | A skill folder renamed without updating `name:` |
 | Check command and agent frontmatter | A command or agent with no `description` |
 | Compile hook scripts | A Python syntax error in any hook |
+| Run the hook tests | A guard or a measurement that silently stops working |
 | Check for project-specific leakage | `restrusher`, "in this project we", or `domain/usecase/` creeping back in |
 
 Every one of these is a failure that produces **no error at runtime**. A skill with broken

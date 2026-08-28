@@ -16,6 +16,7 @@ documentation stays true, and who is allowed to write to git.
 | Command | `/ship <version>` | Run explicitly |
 | Hook | `PreToolUse` on `Bash` | Automatically, before every shell command |
 | Hook | `Stop` | Automatically, at the end of every turn |
+| Tests | `tests/test_*.py` | In CI, and before pushing a change to either hook |
 
 ## The two-file changelog
 

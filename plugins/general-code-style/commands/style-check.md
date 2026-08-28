@@ -41,12 +41,13 @@ Print the report as it comes back. Do not re-rank it, re-summarise it, or re-mea
 yourself — it is already ordered by severity and capped, and it reads its limits from the same
 file the size hook uses.
 
-Then state plainly, in one line, that the sweep covered the size and parameter rules only, and
-that naming and comment discipline were **not** evaluated because those need a reading of the
-code rather than a measurement of it.
+Then state plainly, in one line, what the sweep did not cover: it measures the size and
+parameter rules and flags comments that explain code inside a function body, but **naming** is
+not evaluated, and neither is whether a doc comment says something its member's name already
+says. Both need a reading of the code rather than a measurement of it.
 
 Finally, offer the next step and stop: ask whether to review one of the listed files with the
-`style-reviewer` agent, which does cover the remaining two rules.
+`style-reviewer` agent, which does cover those remaining judgement calls.
 
 ## In both modes
 

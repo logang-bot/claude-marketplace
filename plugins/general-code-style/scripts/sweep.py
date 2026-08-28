@@ -1,38 +1,30 @@
 #!/usr/bin/env python3
-"""Measure a whole tree against the general-code-style size rules.
+"""Measure a whole tree against the general-code-style rules.
 
-Loads the limits and the measurement functions from the PostToolUse hook rather than
+Loads the limits and the measurement functions from `hooks/style_rules/` rather than
 restating them, so a sweep and a post-write advisory can never disagree about a cap.
 
-Reports rules 1-3 only. Naming and comment discipline need judgement about what a reader
-would misunderstand, which is the style-reviewer agent's job, not a script's.
+Reports rules 1-3 and the mechanical half of rule 5 — comments that explain code inside a
+function body. Naming, and whether a doc comment says something its member's name already
+says, need judgement about what a reader would misunderstand: that is the style-reviewer
+agent's job, not a script's.
 """
 import argparse
-import importlib.util
 import os
 import subprocess
 import sys
 from collections import namedtuple
 
-HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir,
-                    'hooks', 'check-size.py')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir,
+                                'hooks'))
+
+import style_rules as rules  # noqa: E402
+
 SKIP_DIRS = {'.git', '.gradle', '.idea', '__pycache__', 'node_modules', 'build',
              'dist', 'out', 'target', 'venv', '.venv', 'Pods', 'vendor'}
-Finding = namedtuple('Finding', 'path lines long wide')
+SOURCE_EXTS = rules.SOURCE_EXTS
+Finding = namedtuple('Finding', 'path lines long wide narrated')
 Sweep = namedtuple('Sweep', 'findings scanned root top')
-
-
-def load_rules():
-    """Import check-size.py by path — its hyphen makes it unimportable by name."""
-    spec = importlib.util.spec_from_file_location('check_size', os.path.normpath(HOOK))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-rules = load_rules()
-SOURCE_EXTS = rules.BRACE_LANGS | {'.py', '.rb', '.dart', '.sh', '.sql', '.kts',
-                                   '.gradle', '.m', '.mm', '.vue', '.svelte'}
 
 
 def tracked_files(root):
@@ -42,9 +34,8 @@ def tracked_files(root):
                               capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return None
-    if done.returncode != 0:
-        return None
-    return [os.path.join(root, name) for name in done.stdout.split('\0') if name]
+    return None if done.returncode != 0 else [os.path.join(root, name)
+                                              for name in done.stdout.split('\0') if name]
 
 
 def walked_files(root):
@@ -82,38 +73,38 @@ def scan_file(path):
     if lines is None:
         return None
     ext = os.path.splitext(path)[1]
-    found = list(rules.iter_functions(lines, ext)) if ext in rules.BRACE_LANGS else []
-    return Finding(path=path,
-                   lines=rules.measure_file(lines),
-                   long=[f for f in found if f[2] > rules.FUNCTION_LIMIT],
-                   wide=[f for f in found if f[3] > rules.PARAM_LIMIT])
+    found = rules.sized_functions(lines, ext)
+    return Finding(path=path, lines=rules.measure_file(lines),
+                   long=[f for f in found if f.body > rules.FUNCTION_LIMIT],
+                   wide=[f for f in found if f.params > rules.PARAM_LIMIT],
+                   narrated=rules.comment_findings(lines, ext))
 
 
 def flagged(finding):
-    return finding.lines > rules.FILE_LIMIT or finding.long or finding.wide
+    return (finding.lines > rules.FILE_LIMIT or finding.long or finding.wide
+            or finding.narrated)
 
 
 def severity(finding):
     """Rank structural problems first, then the worst body, then the widest signature."""
     return (max(0, finding.lines - rules.FILE_LIMIT),
-            max((f[2] for f in finding.long), default=0),
-            max((f[3] for f in finding.wide), default=0))
+            max((f.body for f in finding.long), default=0),
+            max((f.params for f in finding.wide), default=0),
+            len(finding.narrated))
 
 
 def totals(findings):
     return (sum(1 for f in findings if f.lines > rules.FILE_LIMIT),
             sum(len(f.long) for f in findings),
-            sum(len(f.wide) for f in findings))
+            sum(len(f.wide) for f in findings),
+            sum(len(f.narrated) for f in findings))
 
 
 def describe(finding, base):
-    parts = []
-    if finding.lines > rules.FILE_LIMIT:
-        parts.append(f'{finding.lines} lines')
-    parts.extend(f'{name}() {body}-line body at :{line}'
-                 for name, line, body, _ in finding.long)
-    parts.extend(f'{name}() {params} params at :{line}'
-                 for name, line, _, params in finding.wide)
+    parts = ['%d lines' % finding.lines] if finding.lines > rules.FILE_LIMIT else []
+    parts += [f'{f.name}() {f.body}-line body at :{f.line}' for f in finding.long]
+    parts += [f'{f.name}() {f.params} params at :{f.line}' for f in finding.wide]
+    parts += [f'comment at :{line}' for line, _ in finding.narrated]
     return f'{os.path.relpath(finding.path, base)}  ·  ' + ' · '.join(parts)
 
 
@@ -122,12 +113,13 @@ def relative_base(root):
 
 
 def summary_lines(sweep):
-    files_over, long_fns, wide_fns = totals(sweep.findings)
-    return [f'Swept {sweep.scanned} files in {sweep.root} · rules 1-3 only '
-            f'(naming and comments not evaluated)', '',
-            f'  {files_over} files over the {rules.FILE_LIMIT}-line cap',
+    over, long_fns, wide_fns, narrated = totals(sweep.findings)
+    return [f'Swept {sweep.scanned} files in {sweep.root} · size, parameter, and in-body '
+            f'comment rules (naming not evaluated)', '',
+            f'  {over} files over the {rules.FILE_LIMIT}-line cap',
             f'  {long_fns} functions over the {rules.FUNCTION_LIMIT}-line body cap',
-            f'  {wide_fns} signatures over {rules.PARAM_LIMIT} parameters']
+            f'  {wide_fns} signatures over {rules.PARAM_LIMIT} parameters',
+            f'  {narrated} comments explaining code inside a body']
 
 
 def listing_lines(sweep):

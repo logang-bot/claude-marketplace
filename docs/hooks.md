@@ -100,8 +100,9 @@ assert hook.find_violation(f"{G} checkout -B main") is not None
 assert hook.find_violation(f"{G} log --grep=commit") is None
 ```
 
-Test both directions. A guard that blocks everything is as broken as one that blocks nothing —
-the current suite is 24 must-block and 25 must-pass cases.
+Test both directions. A guard that blocks everything is as broken as one that blocks nothing.
+The suite is `plugins/dev-workflow/tests/test_block_git_writes.py`: 35 must-block and 34
+must-pass cases. `test_docs_reminder.py` next to it covers the reminder's classification.
 
 ---
 
@@ -138,8 +139,20 @@ triggers it; editing a `SKILL.md` does not, because `.md` already counts as docu
 
 **Payload keys read:** `tool_input.file_path`
 
-Measures the file that was just written and exits `2` with an advisory when a cap is exceeded.
+Measures the file that was just written and exits `2` with an advisory when a rule is broken.
 The write has already succeeded — the wording makes clear this is advice, not a rejection.
+
+The script itself is a thin entry point. Every measurement lives in `hooks/style_rules/`, a
+package shared with the sweep and the tests:
+
+| Module | Holds |
+|---|---|
+| `limits.py` | The caps and the language sets. One definition, three consumers. |
+| `text.py` | String-literal stripping, comment markers, the allowed-comment list |
+| `sizes.py` | File length, body length, parameter counting |
+| `blocks.py` | Declaration matching and the span of the body each one opens |
+| `comments.py` | Explanatory comments found inside a body |
+| `findings.py` | Advisory wording and the cap on how many are shown |
 
 | Constant | Value | Meaning |
 |---|---|---|
@@ -147,24 +160,51 @@ The write has already succeeded — the wording makes clear this is advice, not 
 | `FUNCTION_LIMIT` | 10 | 7 target + 3 spare, body code lines only |
 | `PARAM_LIMIT` | 3 | Parameters per declaration before the extras must be grouped into a type |
 | `DECL_SPAN` | 12 | Lines a wrapped parameter list may span before it is given up on |
+| `MAX_WARNINGS` | 5 | Advisories shown before the rest collapse into a count |
+| `SOURCE_EXTS` | allow-list | The one scope: what the hook measures and the sweep opens |
 
-File length is measured for any file type. Function length and parameter count only for
-`BRACE_LANGS`, and only the worst offender of each kind is reported — a file raises at most one
-length warning and one parameter warning. Body length counts code lines only: blank lines and
-lines opening with `//`, `#`, `*`, or `/*` do not count, so a doc comment never eats into the
-budget. UI component functions are exempt from both rules, detected by scanning the four lines
-above a declaration for `UI_MARKERS` — see
+File length is measured for the extensions in `SOURCE_EXTS`, and nothing else. That set is
+the **single scope shared with the sweep** — the hook measures a written file only if its
+extension is listed, and the sweep opens a file only if its extension is listed, so the two can
+never disagree about whether something is in scope.
+
+It is an allow-list rather than a deny-list because the sweep reads whole files: anything else
+means walking a tree full of images, archives, and build output. The cost is real — a language
+nobody listed goes unmeasured, and the fix is to add it to `FILE_ONLY_LANGS`, not to widen the
+rule. Prose (`.md`, `.rst`, `.txt`) and data (`.json`, `.yaml`, `.xml`, `.lock`) are absent on
+purpose: a long document is a document, a long resource table is additive, and neither becomes
+harder to read at line 251.
+
+Function length, parameter count, and the comment rule apply to `MEASURED_LANGS` — `BRACE_LANGS` plus Python. **Every** offender is reported, not
+just the worst one, capped at `MAX_WARNINGS` with the remainder summarised as a count. Body
+length counts code lines only: blank lines, lines opening with `//`, `#`, `*`, or `/*`, and a
+leading Python docstring do not count, so documentation never eats into the budget.
+
+Two strategies find a body, picked by extension. Brace languages balance `{`/`}` starting from
+the brace that follows the closing `)` of the parameter list — not from the declaration line,
+which is what used to make a wrapped multi-line signature measure a 0-line body. Python walks
+indentation instead: the body ends at the first non-blank line indented no further than the
+`def`. Brace counting ignores braces inside string literals.
+
+UI component functions are exempt from the size rules, detected by scanning the four lines above
+a declaration for `UI_MARKERS`. They are still yielded, carrying `ui_exempt`, because the
+comment rule applies to them — see
 [plugins/general-code-style.md](plugins/general-code-style.md#the-ui-component-exemption) for the
 declaration-matching details.
+
+The comment check reads only what is inside a body, so a licence banner, a file header, and a
+doc comment above a declaration are out of scope by construction. Tool directives,
+`TODO`/`FIXME`/`HACK`/`XXX` markers, and a Python docstring opening a body are allowed; a run of
+consecutive comment lines is reported once rather than per line. String literals are blanked
+before the search, so a `//` inside a URL is not a comment.
 
 Note that `MultiEdit` and `NotebookEdit` are not in the matcher, so writes through those paths
 are unmeasured.
 
-This script is also imported as a module by `general-code-style/scripts/sweep.py`, which reuses
-its constants and its `measure_file` / `iter_functions` functions to measure a whole tree. Treat
-the constants and those two function signatures as a public surface: changing them changes the
-sweep too, which is the point — it is what stops the two from disagreeing about a cap. The hook
-reduces `iter_functions` to the worst offender per file; the sweep consumes all of it.
+`general-code-style/scripts/sweep.py` imports the same package to measure a whole tree — both
+entry points put their `hooks/` directory on `sys.path` and `import style_rules`. The names
+listed in `style_rules/__init__.py` are a public surface: changing them changes the sweep and
+the tests too, which is the point — it is what stops any two of them disagreeing about a cap.
 
 ---
 
