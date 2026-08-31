@@ -1,7 +1,13 @@
 ---
 name: creating-methods-or-functions
-description: Limits function and method bodies to ~7 lines and 3 parameters (extras grouped into a data class, record, or struct), requires intent-revealing names, and bans explanatory inline comments in favour of doc comments on non-obvious math only. Use when writing or refactoring a function or method, adding a parameter, or commenting inside a body. UI component functions such as Compose composables, React components, and SwiftUI views are exempt from the size limits.
+description: Limits function and method bodies to ~7 lines and 3 parameters (extras grouped into a data class, record, or struct), requires intent-revealing names, and bans explanatory inline comments in favour of doc comments on non-obvious math only. Use when writing or refactoring a function or method, adding a parameter, or commenting inside a body. UI component functions such as Compose composables, React components, and SwiftUI views are exempt from the size limits. Applies however the code was written — including a function added by a shell command, a generator script, or another tool rather than the file editor, and one written while carrying out an already-approved plan.
 ---
+
+**Scope.** These rules apply to every function, whatever wrote it. A function added by a shell
+command (a heredoc, `sed -i`, a generator script) or by another tool is held to them exactly as
+one written with the file editor, and an already-approved plan that fixed the signatures in
+advance does not exempt the code it produces — if the plan conflicts with a rule here, say so
+rather than following it silently.
 
 When creating a method or function, take into consideration these guidelines:
 

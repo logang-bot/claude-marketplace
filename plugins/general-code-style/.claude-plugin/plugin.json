@@ -1,8 +1,10 @@
 {
   "name": "general-code-style",
   "description": "Language-agnostic style rules for file, class, and function size, parameter counts, self-describing names, and comment discipline.",
-  "version": "0.5.0",
-  "author": { "name": "logang-bot" },
+  "version": "0.6.0",
+  "author": {
+    "name": "logang-bot"
+  },
   "repository": "https://github.com/logang-bot/claude-marketplace",
   "license": "MIT"
 }

@@ -1,5 +1,5 @@
 {
-  "description": "Keeps git write commands with the developer, and reminds when code changes without a docs update",
+  "description": "Blocks git write commands and reminds about docs/ when code changed without documentation",
   "hooks": {
     "PreToolUse": [
       {
@@ -7,7 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-git-writes.py\"",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/block-git-writes.sh\"",
             "timeout": 10
           }
         ]
@@ -18,7 +19,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/docs-reminder.py\"",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/docs-reminder.sh\"",
             "timeout": 15
           }
         ]

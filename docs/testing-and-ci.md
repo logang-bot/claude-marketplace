@@ -6,17 +6,20 @@
 # Manifests parse and every marketplace entry points at a real plugin
 for p in plugins/*/; do claude plugin validate "$p" --strict; done
 
-# Hooks at least parse
-python3 -m py_compile plugins/*/hooks/*.py plugins/*/hooks/*/*.py
+# Hooks at least parse. awk modules load per plugin, not one at a time: a module alone
+# cannot see the functions its siblings define.
+for f in $(find plugins -name '*.sh'); do sh -n "$f"; done
+for plugin in plugins/*/; do
+  args=""; for m in $(find "$plugin" -name '*.awk' | sort); do args="$args -f $m"; done
+  [ -n "$args" ] && awk $args </dev/null >/dev/null
+done
 
 # Hook logic still does what it claims to
-python3 plugins/general-code-style/tests/test_style_rules.py
-python3 plugins/dev-workflow/tests/test_block_git_writes.py
-python3 plugins/dev-workflow/tests/test_docs_reminder.py
+for suite in plugins/*/tests/test_*.sh; do sh "$suite"; done
 
 # No plugin has been tied back to one project or the old owner
 grep -rniE 'restrusher|in this project we|domain/usecase/' \
-  --include='*.md' --include='*.json' --include='*.py' \
+  --include='*.md' --include='*.json' --include='*.sh' --include='*.awk' \
   .claude-plugin plugins README.md
 ```
 
@@ -30,38 +33,47 @@ violation of it.
 ## Testing hooks
 
 Hooks are the only executable part of the repo, and the only part that can fail silently in the
-permissive direction — see [hooks.md](hooks.md#hooks-fail-open). `py_compile` proves a file
-parses; it proves nothing about whether the logic is right.
+permissive direction — see [hooks.md](hooks.md#hooks-fail-open). `sh -n` proves a file parses;
+it proves nothing about whether the logic is right.
 
-Test with fixtures kept **in a file**, importing the hook directly rather than shelling out:
+Test with fixtures kept **in a file**, driving the hook's own awk modules rather than
+re-implementing their logic in the harness:
 
-```python
-import importlib.util
-spec = importlib.util.spec_from_file_location("hook", "plugins/dev-workflow/hooks/block-git-writes.py")
-hook = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(hook)
+```sh
+G=$(printf 'g%s' 'it')
+must_block() {
+cat <<EOF
+$G push --force
+EOF
+}
 ```
 
-The reason fixtures live in a file rather than on the command line: `block-git-writes.py` scans
-the entire Bash command string, so a harness that writes `git commit` as an argument *is* a
-command containing `git commit`, and the installed hook blocks the test run. Building fixture
-strings by concatenation (`G = "g" + "it"`) keeps them inert.
+The reason fixtures live in a file rather than on the command line: `block-git-writes.sh` scans
+the entire Bash command string, so a harness that spells a blocked command out as an argument
+*is* a command containing it, and the installed hook blocks the test run. An unquoted heredoc
+expands `$G` only when the test runs, so the file on disk stays inert.
 
-Always test both directions. `plugins/dev-workflow/tests/test_block_git_writes.py` is 35
+Always test both directions. `plugins/dev-workflow/tests/test_block_git_writes.sh` is 35
 must-block and 34 must-pass cases; the must-pass half is what caught the anchoring bug, where
 read-only commands like `git log --grep=commit` were being denied, and it is what made the
-guard safe to refactor. `test_docs_reminder.py` covers the reminder's file classification.
+guard safe to refactor. `test_docs_reminder.sh` covers the reminder's file classification.
 
-`plugins/general-code-style/tests/test_style_rules.py` covers the size and comment measurements
-the same way, importing `hooks/style_rules/` directly. Its must-pass half is the load-bearing
-one: a comment check that flags `TODO`, a licence header, a `//` inside a URL, or a Python
-docstring would make the hook unusable noise, and a parameter counter that miscounts a trailing
-comma or a `Map<String, Int>` invents findings that are not there.
+`plugins/general-code-style/tests/test_style_rules.sh` covers the size and comment measurements
+through `tests/probe.awk`, a test-only driver that prints the measurements themselves rather than
+the sentences they become, so a fixture asserts on a body length directly. Its must-pass half is
+the load-bearing one: a comment check that flags `TODO`, a licence header, a `//` inside a URL,
+or a Python docstring would make the hook unusable noise, and a parameter counter that miscounts
+a trailing comma or a `Map<String, Int>` invents findings that are not there.
 
 ## What `validate.yml` checks
 
-Runs on every push and pull request, on a fresh `ubuntu-latest` runner. Pure `bash` and
-`python3` — nothing to install.
+Runs on every push and pull request, in two jobs: `manifests` on `ubuntu-latest` and `windows` on
+`windows-latest`.
+
+The runner may use whatever it likes — the manifest and frontmatter validators are Python, which
+GitHub provides. **The shipped plugins may not.** That distinction is the whole point of the
+migration: a check that runs on a CI runner has a guaranteed toolchain, and a hook on a
+contributor's laptop does not.
 
 | Step | Catches |
 |---|---|
@@ -70,7 +82,7 @@ Runs on every push and pull request, on a fresh `ubuntu-latest` runner. Pure `ba
 | Check skill frontmatter | A `SKILL.md` with no frontmatter block, or missing `name` / `description` |
 | Check skill directory names match frontmatter | A skill folder renamed without updating `name:` |
 | Check command and agent frontmatter | A command or agent with no `description` |
-| Compile hook scripts | A Python syntax error in any hook |
+| Check hook scripts parse | A shell or awk syntax error, and a name used as a function in one module and a variable in another |
 | Run the hook tests | A guard or a measurement that silently stops working |
 | Check for project-specific leakage | `restrusher`, "in this project we", or `domain/usecase/` creeping back in |
 
@@ -78,6 +90,20 @@ Every one of these is a failure that produces **no error at runtime**. A skill w
 frontmatter does not crash — it silently never loads, in every project that installed the
 plugin, and you notice weeks later when a convention stops firing for no visible reason. The
 workflow turns that into a red ✗ thirty seconds after you push.
+
+### The Windows job
+
+`windows-latest` runs the same parse checks and test suites under Git Bash — the same shell
+Claude Code picks for hooks on a Windows machine that has git. Nothing else proves the plugins
+work there, and three failures show up on Windows and nowhere else:
+
+- a `core.autocrlf` checkout handing bash a script with CRLF endings, which fails with
+  `\r: command not found`. A dedicated step asserts no CRLF survives the checkout, backing up
+  the `eol=lf` pin in `.gitattributes`.
+- a path arriving with backslashes and a drive letter.
+- an `awk` that is missing from the Git Bash install. The job prints `awk --version` before
+  anything else, so a change in what Git for Windows bundles surfaces as a specific failure
+  rather than as a mysterious one.
 
 ## <a id="ci-is-a-report-not-a-gate"></a>CI is a report, not a gate
 

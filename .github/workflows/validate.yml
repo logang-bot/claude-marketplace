@@ -105,17 +105,32 @@ jobs:
           sys.exit(1 if failed else 0)
           PY
 
-      - name: Compile hook scripts
+      - name: Check hook scripts parse
         run: |
-          find plugins -name '*.py' -print -exec python3 -m py_compile {} +
+          # The syntax floor. A hook that cannot run is indistinguishable, in the
+          # moment, from a hook that decided to allow everything.
+          #
+          # awk modules load per plugin rather than one at a time: a module alone
+          # cannot see the functions its siblings define, and loading the set also
+          # catches a name used as a function in one file and a variable in another.
+          for f in $(find plugins -name '*.sh'); do sh -n "$f" && echo "ok  $f"; done
+          for plugin in plugins/*/; do
+            modules=$(find "$plugin" -name '*.awk' | sort)
+            [ -n "$modules" ] || continue
+            args=""
+            for m in $modules; do args="$args -f $m"; done
+            problems=$(awk $args </dev/null 2>&1 >/dev/null) || true
+            if [ -n "$problems" ]; then echo "$problems"; exit 1; fi
+            echo "ok  $plugin awk modules parse together"
+          done
 
       - name: Run the hook tests
         run: |
-          # py_compile proves these parse. This proves they still do what they claim to, which
-          # matters because hooks fail open — a guard that stops guarding is silent.
-          for suite in plugins/*/tests/test_*.py; do
+          # Parsing proves nothing about the logic, and hooks fail open — a guard that
+          # stops guarding is silent.
+          for suite in plugins/*/tests/test_*.sh; do
             echo "== $suite"
-            python3 "$suite"
+            sh "$suite"
           done
 
       - name: Check for project-specific leakage
@@ -123,9 +138,62 @@ jobs:
           # Scoped to shipped plugin content. docs/ and .github/ are excluded on purpose:
           # they document these patterns, so they legitimately contain the words.
           if grep -rniE 'restrusher|in this project we|domain/usecase/' \
-               --include='*.md' --include='*.json' --include='*.py' \
+               --include='*.md' --include='*.json' --include='*.sh' --include='*.awk' \
                .claude-plugin plugins README.md; then
             echo "found a reference that ties a plugin to one project or the old owner"
             exit 1
           fi
           echo "ok  no project-specific references"
+
+  windows:
+    # The plugins ship shell and awk precisely so they run here. Nothing else proves that:
+    # a CRLF checkout, a path that arrives with backslashes, or an awk that is missing from
+    # Git Bash all fail on Windows and nowhere else. windows-latest provides Git Bash as
+    # `bash`, which is the same shell Claude Code picks for hooks on a machine with git.
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm the runtime the plugins depend on
+        run: |
+          command -v awk && awk --version 2>/dev/null | head -1 || awk -W version 2>&1 | head -1
+          command -v git && git --version
+
+      - name: Check the checkout kept LF endings
+        run: |
+          # .gitattributes pins eol=lf. Without it a core.autocrlf checkout hands bash
+          # scripts with CRLF endings, and bash fails on those with `\r: command not found`
+          # — a silent hook failure, which is the bug this migration exists to end.
+          for f in $(find plugins -name '*.sh' -o -name '*.awk'); do
+            if grep -qU $'\r' "$f"; then echo "CRLF in $f"; exit 1; fi
+          done
+          echo "ok  no CRLF in any shipped script"
+
+      - name: Check hook scripts parse
+        run: |
+          # The syntax floor. A hook that cannot run is indistinguishable, in the
+          # moment, from a hook that decided to allow everything.
+          #
+          # awk modules load per plugin rather than one at a time: a module alone
+          # cannot see the functions its siblings define, and loading the set also
+          # catches a name used as a function in one file and a variable in another.
+          for f in $(find plugins -name '*.sh'); do sh -n "$f" && echo "ok  $f"; done
+          for plugin in plugins/*/; do
+            modules=$(find "$plugin" -name '*.awk' | sort)
+            [ -n "$modules" ] || continue
+            args=""
+            for m in $modules; do args="$args -f $m"; done
+            problems=$(awk $args </dev/null 2>&1 >/dev/null) || true
+            if [ -n "$problems" ]; then echo "$problems"; exit 1; fi
+            echo "ok  $plugin awk modules parse together"
+          done
+
+      - name: Run the hook tests
+        run: |
+          for suite in plugins/*/tests/test_*.sh; do
+            echo "== $suite"
+            sh "$suite"
+          done

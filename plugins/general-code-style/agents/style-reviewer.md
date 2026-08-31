@@ -37,7 +37,7 @@ Group findings by file. For each: `path:line`, which rule, the measured number a
 limit, and the concrete split or grouping you would suggest. Order files by severity.
 
 Rules 1-3, and explanatory comments inside a function body, are already measured
-mechanically by the size hook and `scripts/sweep.py`. Confirm them, but spend your effort where
+mechanically by the size hook and `scripts/sweep.sh`. Confirm them, but spend your effort where
 a measurement cannot reach: rule 4, and doc comments that restate a name.
 
 Report the measurement, not an impression — say "148-line body" rather than "quite long". If

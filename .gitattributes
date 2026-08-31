@@ -1,0 +1,5 @@
+# Plugins install by git-clone into the Claude Code plugin cache. On a machine with
+# core.autocrlf=true the hook scripts would otherwise arrive with CRLF endings, and bash
+# fails on those with `\r: command not found` — a silent hook failure, which is the exact
+# class of bug this repo already had once with a missing Python.
+* text=auto eol=lf

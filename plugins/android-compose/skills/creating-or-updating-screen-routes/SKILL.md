@@ -1,6 +1,6 @@
 ---
 name: creating-or-updating-screen-routes
-description: Keeps Compose navigation graphs thin — each screen creates its own ViewModels, the route passes only primitive arguments such as IDs and flags, and LaunchedEffect and remember stay inside the screen composable. Use when adding or editing a route, working in a NavHost or navigation composable, or wiring a screen into navigation.
+description: Keeps Compose navigation graphs thin — each screen creates its own ViewModels, the route passes only primitive arguments such as IDs and flags, and LaunchedEffect and remember stay inside the screen composable. Use when adding or editing a route, working in a NavHost or navigation composable, or wiring a screen into navigation. Applies however the file was written — including one created by a shell command or another tool rather than the file editor, and one written while carrying out an already-approved plan.
 paths: "**/*.kt"
 ---
 

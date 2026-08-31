@@ -30,11 +30,11 @@ Relay its findings grouped by file, most severe first.
 
 ## Sweep
 
-Locate `scripts/sweep.py` inside this plugin by globbing for
-`**/general-code-style/scripts/sweep.py` rather than assuming an install path, then run it:
+Locate `scripts/sweep.sh` inside this plugin by globbing for
+`**/general-code-style/scripts/sweep.sh` rather than assuming an install path, then run it:
 
 ```
-python3 <path-to>/sweep.py <target> --top 20
+sh <path-to>/sweep.sh <target> --top 20
 ```
 
 Print the report as it comes back. Do not re-rank it, re-summarise it, or re-measure anything

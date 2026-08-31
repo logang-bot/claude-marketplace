@@ -14,10 +14,11 @@ restating it.
 | Skill | `creating-methods-or-functions` | A method or function is being written |
 | Agent | `style-reviewer` | Asked to check style, or after a batch of new code |
 | Command | `/style-check [path] [--sweep]` | Run explicitly |
-| Hook | `PostToolUse` on `Write\|Edit` | Automatically, after every file write |
-| Script | `scripts/sweep.py` | Via `/style-check` on a large target, or run directly |
-| Package | `hooks/style_rules/` | Imported by the hook, the sweep, and the tests |
-| Tests | `tests/test_style_rules.py` | In CI, and before pushing a measurement change |
+| Hook | `PostToolUse` on `Write\|Edit\|MultiEdit\|NotebookEdit` | After every write that names a file |
+| Hook | `Stop` | At end of turn, over files git reports as new — whatever tool created them |
+| Script | `scripts/sweep.sh` | Via `/style-check` on a large target, or run directly |
+| Modules | `hooks/lib/*.awk` | Loaded by the hooks, the sweep, and the tests |
+| Tests | `tests/test_*.sh` | In CI, and before pushing a measurement change |
 
 ## The rules
 
@@ -27,7 +28,7 @@ restating it.
 | Function body | ~7 lines | 10 (`FUNCTION_LIMIT`) |
 | Parameters | 3 | 3 (`PARAM_LIMIT`) — grouped into a type beyond that |
 
-File length applies to source files — the extensions in `SOURCE_EXTS`, which is also exactly
+File length applies to source files — the extensions in `SOURCE`, which is also exactly
 what the sweep opens. Prose (`.md`, `.rst`, `.txt`, …) and data or markup (`.json`, `.yaml`,
 `.xml`, `.lock`, …) are outside it: a long document is a document, a long resource table is
 additive, and neither becomes harder to read at line 251.
@@ -77,19 +78,19 @@ The exemption is honoured in three places, and they must agree:
 
 - `creating-methods-or-functions/SKILL.md` states it
 - `style-reviewer` is told to note such functions as exempt rather than report them
-- `check-size.py` detects them by scanning the four lines above a declaration for `UI_MARKERS`
+- `blocks.awk` detects them by scanning the four lines above a declaration for the UI markers
   (`@Composable`, `@Preview`, `React.FC`, `: FC<`, `some View`)
 
 File length is **not** exempt for UI code. A 400-line screen file is still a finding.
 
 ## The size hook
 
-`hooks/check-size.py` runs after every `Write` or `Edit` and measures the file that was just
+`hooks/check-size.sh` runs after every write that names a file and measures the file that was just
 written. It exits `2` with an advisory on stderr when a rule is broken — the write has already
 succeeded, so the message is advice, not a rejection. It checks four things: file length,
 function body length, parameter count, and comments that explain code inside a function body.
 
-The script is a thin entry point; the measurements live in `hooks/style_rules/`, a package the
+The script is a thin entry point; the measurements live in `hooks/lib/`, a set of awk modules the
 sweep and the tests import too, so no two of them can disagree about a cap.
 
 Body length counts code lines only — `measure_body` drops blank lines, any line opening with
@@ -106,19 +107,19 @@ values, or collection literals do not inflate the count. Lambda arrows and compa
 lists six. The advisory stops at `MAX_WARNINGS` (5) and collapses the rest into a count, so it
 stays readable without turning into whack-a-mole.
 
-Three tiers, all defined in `hooks/style_rules/limits.py`:
+Three tiers, all defined in `hooks/lib/limits.awk`:
 
 | Tier | Contents | Rules applied |
 |---|---|---|
-| `MEASURED_LANGS` | `BRACE_LANGS` (Kotlin/`.kts`, Java, JS/TS, Swift, C/C++, C#, Go, Rust, Scala, PHP, Dart, Gradle, Groovy) plus Python | All of them |
-| `FILE_ONLY_LANGS` | Ruby, shell, SQL, Obj-C, `.vue`, `.svelte`, Lua, Perl, R, Julia, Elixir, Erlang, Haskell, Clojure, Terraform, and friends | File length only |
-| `SOURCE_EXTS` | The union of the two | The scope of both the hook and the sweep |
+| `MEASURED` | `BRACE` (Kotlin/`.kts`, Java, JS/TS, Swift, C/C++, C#, Go, Rust, Scala, PHP, Dart, Gradle, Groovy) plus Python | All of them |
+| `FILE_ONLY` | Ruby, shell, awk, SQL, Obj-C, `.vue`, `.svelte`, Lua, Perl, R, Julia, Elixir, Erlang, Haskell, Clojure, Terraform, and friends | File length only |
+| `SOURCE` | The union of the two | The scope of both the hook and the sweep |
 
-`FILE_ONLY_LANGS` exists because no body strategy fits those languages: Ruby needs `def`/`end`
+`FILE_ONLY` exists because no body strategy fits those languages: Ruby needs `def`/`end`
 matching, `.vue` and `.svelte` mix markup with script, and the rest are simply languages the
 declaration patterns were never written for. Adding one there is a one-line change and costs
-nothing; adding one to `MEASURED_LANGS` means its declarations must match `DECL` or
-`DECL_TYPED` first.
+nothing; adding one to `MEASURED` means its declarations must match `decl_name()` or
+`typed_name()` first.
 
 Two ways of finding a body, picked by extension:
 
@@ -131,12 +132,16 @@ Two ways of finding a body, picked by extension:
 
 Two declaration patterns are recognised:
 
-- `DECL` — an optional run of modifiers followed by `fun` / `func` / `fn` / `def` / `function`.
-  Requiring a real declaration keyword is what stops trailing-lambda calls like `Column(...) {`
-  or `items(...) {` being counted as functions.
-- `DECL_TYPED` — Java/C#/C++ shape, where modifiers are followed by a return type and then the
-  name. There is no keyword to key on, so an access modifier or `static` is required to keep
-  the match honest. Only tried for languages not in `KEYWORD_LANGS`.
+- `decl_name()` — an optional run of modifiers followed by `fun` / `func` / `fn` / `def` /
+  `function`. Requiring a real declaration keyword is what stops trailing-lambda calls like
+  `Column(...) {` or `items(...) {` being counted as functions.
+- `typed_name()` — Java/C#/C++ shape, where modifiers are followed by a return type and then
+  the name. There is no keyword to key on, so an access modifier or `static` is required to
+  keep the match honest. Only tried for languages not in `KEYWORD`.
+
+  The Python original captured the name with a lazy quantifier, which ERE has no equivalent
+  for. `typed_name()` validates the shape with a greedy pattern and then takes the identifier
+  immediately before the parameter list, which is the same name in every real declaration.
 
 Nested declarations are skipped by jumping past each function once measured, so a helper
 declared inside another function is not double-counted.
@@ -191,20 +196,20 @@ which are worth acting on in isolation. The intended order is:
 
 ## The sweep script
 
-`scripts/sweep.py` measures a whole tree. It imports the limits, `measure_file`,
-`sized_functions`, and `comment_findings` from `hooks/style_rules/` rather than restating any of
+`scripts/sweep.sh` measures a whole tree. It loads the same `hooks/lib/` modules the hooks do
+rather than restating any of
 them, so a sweep and a post-write advisory can never disagree about a cap. It puts the plugin's
 `hooks/` directory on `sys.path` and imports the package by name.
 
 ```
-python3 scripts/sweep.py <path> [--top N] [--strict]
+sh scripts/sweep.sh <path> [--top N] [--strict]
 ```
 
 `--top` caps the file listing (default 20) so a legacy repo does not dump thousands of lines.
 `--strict` exits `1` when anything is found, which makes the same script usable as a CI gate;
 the default exit is `0` because a report is not a failure.
 
-File discovery uses `SOURCE_EXTS` — the same set the hook measures — with `git ls-files` when
+File discovery uses `SOURCE` — the same set the hook measures, read through `scope.awk` — with `git ls-files` when
 the target is in a repo, so `.gitignore` is respected for free, and a filesystem walk otherwise. Either way `SKIP_DIRS` drops
 `node_modules`, `build`, `vendor`, and friends — vendored and generated code is often tracked,
 so being in git is not enough to make something worth measuring.

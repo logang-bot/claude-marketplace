@@ -45,8 +45,9 @@ Language-agnostic. Install everywhere.
 | Skill | `creating-methods-or-functions` | ~7-line bodies, max 3 parameters, intent-revealing names, no explanatory comments |
 | Agent | `style-reviewer` | Read-only review against the size, parameter, naming, and comment rules |
 | Command | `/style-check [path] [--sweep]` | Reviews a diff or small path with the agent; sweeps a large one mechanically |
-| Script | `scripts/sweep.py` | Measures a whole tree against the size rules, no model involved |
+| Script | `scripts/sweep.sh` | Measures a whole tree against the size rules, no model involved |
 | Hook | `PostToolUse` | Warns when a written file or function exceeds the caps, or takes too many parameters |
+| Hook | `Stop` | Measures files git reports as new, catching writes made by a shell command or another tool |
 
 UI component functions (Compose composables, React components, SwiftUI views) are exempt from
 the body-length and parameter rules — and from those two only — in both the skill and the hook.
@@ -121,7 +122,8 @@ checkout instead:
 `/reload-plugins` picks up further edits without restarting the session. This repo's own
 `.claude/settings.json` is gitignored so it can hold whichever of the two you are using.
 
-Hook scripts are Python 3 with no third-party dependencies. They read the hook payload on
+Hook scripts are POSIX shell and awk, so they run wherever git does — including Git Bash on
+Windows, which is the shell Claude Code uses for hooks there. They read the hook payload on
 stdin and exit 2 to surface a message; every one exits 0 on malformed input, a missing file,
 or a non-git directory, so a broken hook degrades to silence rather than blocking work.
 
@@ -134,7 +136,7 @@ Deeper reference lives in [`docs/`](docs/):
 | [`docs/plugins/`](docs/plugins/) | One page per plugin — every skill, command, agent, and hook |
 | [`docs/architecture.md`](docs/architecture.md) | Discovery chain, consumer settings, install pinning and updates |
 | [`docs/authoring.md`](docs/authoring.md) | Frontmatter reference and how to add a component |
-| [`docs/hooks.md`](docs/hooks.md) | The three hooks, the exit-code contract, how to test one |
+| [`docs/hooks.md`](docs/hooks.md) | The four hooks, the exit-code contract, how to test one |
 | [`docs/testing-and-ci.md`](docs/testing-and-ci.md) | Local checks, what `validate.yml` covers, release steps |
 
 ## License

@@ -1,5 +1,3 @@
-__pycache__/
-*.pyc
 
 # Local marketplace wiring — this repo points at either the published marketplace or a
 # local checkout depending on what you are testing. Consumers commit their own copy.

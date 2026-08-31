@@ -1,6 +1,6 @@
 ---
 name: creating-composables
-description: Structures Jetpack Compose @Composable functions — Modifier as the first optional parameter passed to the root element, splitting into focused child composables, and moving business logic out to a ViewModel or UseCase. Use when writing or editing a @Composable function in Kotlin.
+description: Structures Jetpack Compose @Composable functions — Modifier as the first optional parameter passed to the root element, splitting into focused child composables, and moving business logic out to a ViewModel or UseCase. Use when writing or editing a @Composable function in Kotlin. Applies however the file was written — including one created by a shell command or another tool rather than the file editor, and one written while carrying out an already-approved plan.
 paths: "**/*.kt"
 ---
 
