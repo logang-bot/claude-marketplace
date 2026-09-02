@@ -44,7 +44,11 @@ Language-agnostic. Install everywhere.
 | Skill | `creating-files-or-classes` | ~200-line file cap, split when approaching it, self-describing names |
 | Skill | `creating-methods-or-functions` | ~7-line bodies, max 3 parameters, intent-revealing names, no explanatory comments |
 | Agent | `style-reviewer` | Read-only review against the size, parameter, naming, and comment rules |
+| Agent | `senior-reviewer` | Read-only design review — cohesion, coupling, leaky abstractions, testability |
+| Agent | `leak-hunter` | Finds leaked resources across every lifecycle and fixes them, reporting each edit |
 | Command | `/style-check [path] [--sweep]` | Reviews a diff or small path with the agent; sweeps a large one mechanically |
+| Command | `/design-review [path]` | Runs the design review over a diff or a module |
+| Command | `/leak-check [path] [--report-only]` | Hunts and fixes leaks; `--report-only` reviews without editing |
 | Script | `scripts/sweep.sh` | Measures a whole tree against the size rules, no model involved |
 | Hook | `PostToolUse` | Warns when a written file or function exceeds the caps, or takes too many parameters |
 | Hook | `Stop` | Measures files git reports as new, catching writes made by a shell command or another tool |

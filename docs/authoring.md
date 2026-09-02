@@ -93,12 +93,18 @@ model: inherit
 ---
 ```
 
-`tools` restricts what the agent may do — both agents here are read-only by construction, which
+`tools` restricts what the agent may do — most agents here are read-only by construction, which
 is what makes "it reports, it never edits" a guarantee rather than an instruction. `model:
 inherit` uses the parent session's model.
 
-State the read-only contract in the body too. The frontmatter enforces it; the prose is what
-stops the agent trying and failing.
+State the contract in the body too. The frontmatter enforces it; the prose is what stops the
+agent trying and failing.
+
+**Grant an editing agent the narrowest tool set that does the job.** `leak-hunter` is the one
+agent that edits, and it has `Edit` without `Write`: every fix it makes is a change to code that
+already exists, so it has no reason to create a file. Where an agent edits, the body must also
+carry a fix policy — what it may change, and what it must report instead of changing — because
+`tools` can say "may edit" but not "may not edit the wrong thing".
 
 ## House rules
 
