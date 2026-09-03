@@ -4,8 +4,10 @@ Hooks are the only part of a plugin that **executes on its own**. Skills, comman
 are markdown instructions that shape what Claude does; a hook is a program the harness runs at a
 fixed point in the loop, whether or not anyone asked.
 
-All four here are POSIX shell for the glue and `awk` for anything that has to read code. They
-read the hook payload as JSON on stdin and communicate back through their exit code.
+All five here are POSIX shell for the glue and `awk` for anything that has to read code. They
+read the hook payload as JSON on stdin and communicate back through their exit code — except
+`inject-rules.sh`, which answers on stdout in JSON, because injecting context is not something
+an exit code can express.
 
 ## Why shell and awk
 
@@ -36,7 +38,7 @@ Write **POSIX awk only**: macOS ships BWK awk, so `gensub()`, `IGNORECASE`, `@in
 | Exit | Meaning |
 |---|---|
 | `0` | Silent. Allow whatever was about to happen. |
-| `2` | Surface the stderr text. On `PreToolUse` this **blocks** the tool call; on `PostToolUse` and `Stop` the call already happened, so the text is advice. |
+| `2` | Surface the stderr text. On `PreToolUse` this **blocks** the tool call; on `PostToolUse`, `PostToolBatch` and `Stop` the call already happened, so the text is advice. |
 | anything else | **Non-blocking error.** The message may surface, but nothing is prevented. |
 
 ### Hooks fail open
@@ -82,8 +84,12 @@ would break, since the plugin runs from the cache, not from this repo:
 }
 ```
 
-`matcher` filters by tool name and accepts a regex alternation (`"Write|Edit"`). `Stop` takes no
-matcher — there is no tool to match on.
+`matcher` filters by tool name and accepts a regex alternation (`"Write|Edit"`). `Stop`,
+`SubagentStart` and the other non-tool events take no matcher — there is no tool to match on.
+
+**`PostToolBatch` is the trap.** It carries a whole batch of calls, and its matcher must match
+**every** call in it, not any of them — so a matcher of `Write|Edit` silently skips a batch that
+also held a `Read`. Filter inside the script instead; `check-size.sh` does, via `lib/batch.awk`.
 
 `"shell": "bash"` is pinned on every hook here. Without it, a Windows machine with no Git Bash
 would run the command through PowerShell, where a `sh` invocation means nothing.
@@ -187,15 +193,43 @@ editing a `SKILL.md` does not, because `.md` already counts as documentation.
 
 ## `check-size.sh`
 
-**Event:** `PostToolUse` · **Matcher:** `Write|Edit|MultiEdit|NotebookEdit` · **Timeout:** 10s ·
-Plugin: `general-code-style`
+**Event:** `PostToolBatch` · **No matcher** · **Timeout:** 10s · Plugin: `general-code-style`
 
-**Payload keys read:** the first of `tool_input.file_path`, `notebook_path`, `path`, `filePath`
-that names a file that exists. Tools disagree about what to call the target, and an MCP server
-that writes files picks its own name, so the common spellings are all tried.
+**Payload keys read:** `tool_calls[].tool_name`, and the first of `tool_input.file_path`,
+`notebook_path`, `path`, `filePath` at the same index that names a file that exists. Tools
+disagree about what to call the target, and an MCP server that writes files picks its own name,
+so the common spellings are all tried.
 
-Measures the file that was just written and exits `2` with an advisory when a rule is broken.
-The write has already succeeded — the wording makes clear this is advice, not a rejection.
+Measures everything the batch wrote and exits `2` with one advisory when a rule is broken. The
+writes have already succeeded — the wording makes clear this is advice, not a rejection.
+
+### Why the batch, not the call
+
+`PostToolUse` fires per tool and runs **concurrently for parallel calls**, so five writes in one
+block produced five separate hook processes, each printing its own advisory and each applying
+`MAX_WARNINGS` on its own — the cap held five times over instead of once. `PostToolBatch` fires
+once after every call in the batch has resolved, so the whole batch is measured together and the
+cap means what it says. It is also where `advise.awk`'s `scope` earns its keep: the file is named
+only when exactly one was measured, the same rule `check-new-files.sh` follows.
+
+### The matcher is omitted deliberately
+
+A `PostToolBatch` matcher must match **every** call in the batch, not any of them. With
+`Write|Edit|MultiEdit|NotebookEdit`, a batch holding one `Read` beside a `Write` would skip the
+hook entirely. So no matcher is set and the write-tool filter lives in `lib/batch.awk`, which
+pairs each `tool_name` with the path at the same array index and keeps only the calls that
+actually wrote. Without that filter the hook would measure a file that was merely **read**, which
+is how an advisory becomes a nag.
+
+### The risk worth naming
+
+`PostToolBatch` is in the client's hook schema but has **no changelog entry anywhere in 2.x**. If
+it turns out to be inert on some client, this check silently stops running — the exact failure
+this whole migration exists to end. Two things blunt it: `check-new-files.sh` still catches every
+**new** file at `Stop` regardless of event support, and the script still handles the single-call
+payload shape, so re-registering it on `PostToolUse` restores the old behaviour with no code
+change. The gap that would open in the meantime is narrow but real: **a modification to a file
+that already exists**, which the `Stop` hook does not measure by design.
 
 This hook only ever sees a write that **carries a path in its payload**. A heredoc, a `sed -i`,
 or a generator script carries none, and no matcher can fix that — that gap is what
@@ -237,6 +271,59 @@ end to end against a scratch repository — `git init` alone exercises the untra
 asserts the diff query still carries `--diff-filter=A`, because dropping that flag is the
 specific edit that would turn this hook into a nag.
 
+The advisory closes by naming the `style-reviewer` agent and the files it should read. That is
+not decoration. **No hook can launch an agent** — there is no such output field on any event —
+and Claude Code's default posture suppresses spawning one unprompted, which is why the agents in
+this plugin never fired on their own. Rules 1-3 and the comment rule are already measured above;
+naming and doc comments that restate a name are not, because both need the code read rather than
+counted. Naming the agent and the paths is the most a hook can do about it, and it makes
+accepting the offer a single word instead of a round trip to reconstruct what to review.
+
+---
+
+## `inject-rules.sh`
+
+**Event:** `SubagentStart` · **No matcher** · **Timeout:** 15s · Plugin: `general-code-style`
+
+**Payload keys read:** none beyond a blankness check. The event carries `agent_id` and
+`agent_type`; neither is consulted.
+
+The only part of this repo that is **deterministic rather than advisory**. A subagent starts with
+a fresh context and does no description matching against this plugin, so the skills that shape
+how code gets written never reach it — its files were caught only afterwards, by
+`check-new-files.sh`, once the work was done. This hook hands it the rules before it starts.
+
+It answers on **stdout in JSON**, not through an exit code:
+
+```json
+{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"…"}}
+```
+
+`additionalContext` is the one channel that puts text into a subagent's context. The client caps
+it at 8000 characters; `lib/jsonout.awk` truncates at 7000 **before** escaping, never after,
+because cutting escaped output could sever a `\uXXXX` and produce a payload that will not parse.
+Today's payload is around 3,700 characters.
+
+The rules are read from the plugin's own `skills/*/SKILL.md` bodies at runtime, frontmatter
+stripped, rather than restated in the script. One copy to keep right, and the directory is the
+list — adding a skill adds it to the injection with no registration, which is how every other
+component here is discovered. It is the same reason `limits.awk` holds the caps alone.
+
+Injection is **unconditional**. Gating on `agent_type` would mean maintaining a list of names for
+agents this plugin does not own, and such a list fails in the silent direction: a new writing
+agent gets no rules and nothing says so. The cost is a couple of kilobytes spent on a read-only
+agent like `Explore`.
+
+Two limits worth knowing. The client **skips this injection entirely** for a subagent running
+with an isolated context, and there is no signal here that it happened. And `SubagentStart`
+landed in **2.0.43**, so unlike `PostToolBatch` it is well established.
+
+Fixtures are in `plugins/general-code-style/tests/test_inject_rules.sh`. They check the envelope
+structurally with `grep` rather than with a JSON parser, because these suites also run on Windows
+Git Bash where nothing beyond `awk` and the POSIX utilities is guaranteed. Escaping is exercised
+against `jsonout.awk` directly — driving it through the hook would only ever test the characters
+that happen to be in a `SKILL.md` today.
+
 ---
 
 ## The measurement engine
@@ -264,7 +351,9 @@ awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" \
 | `report.awk` | Records in, sweep report out |
 | `scope.awk` | Filters a path list down to source files |
 | `skip.awk` | Drops build output and dependency directories |
-| `json.awk` | One scalar out of a hook payload, by dotted path |
+| `json.awk` | Scalars out of a hook payload, by dotted path; `all=1` for every match in an array |
+| `jsonout.awk` | Text in, one line of `additionalContext` hook JSON out |
+| `batch.awk` | Pairs tool names with paths in a batch, keeping only the calls that wrote |
 
 `measure.awk` prints **records, not sentences**, because the hooks and the sweep need the same
 numbers in different shapes:
@@ -325,6 +414,21 @@ Its unescaping is a **left-to-right scan, not a series of `gsub`s**, and that is
 preference. A Windows path arrives as `"C:\\new\\file"`, whose raw text contains a backslash
 followed by `n`; any `gsub` that rewrites `\n` first would put a newline in the middle of a
 directory name.
+
+A path inside an array is addressed with `[]` — `tool_calls[].tool_name`. Without `all`, the last
+match wins, which is the original single-value contract untouched. With `-v all=1`, every match
+prints as `<index>\t<value>`, the index counting from 1 within the **nearest enclosing array**.
+That index is the whole point: a batch's tool name and the file path it wrote sit under different
+keys and are related only by their position, so `batch.awk` pairs them by index to decide which
+paths belong to calls that actually wrote. A value containing a newline is dropped in this mode
+rather than printed, because it would break the one-record-per-line pairing — losing a
+measurement is recoverable, pairing a tool name against the wrong file is not.
+
+`jsonout.awk` is the write side, and it escapes with the same left-to-right scan for the mirror
+reason: each `gsub` pass rewrites the text the next one reads, so an earlier substitution can
+manufacture the sequence a later one then mangles. Its `limit` truncates the raw text **before**
+escaping — cutting escaped output could sever a `\uXXXX` and produce a payload that will not
+parse.
 
 ---
 

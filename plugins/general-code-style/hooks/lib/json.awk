@@ -1,9 +1,17 @@
-# Extracts one scalar from a hook payload, addressed by dotted path.
+# Extracts scalars from a hook payload, addressed by dotted path.
 #
 #   awk -f json.awk -v key=tool_input.file_path < payload.json
+#   awk -f json.awk -v key='tool_calls[].tool_name' -v all=1 < payload.json
 #
 # Exits 0 having printed the value, or 1 when the key is absent or the payload will not
 # parse — every caller treats that as "no value" rather than as an error.
+#
+# A path inside an array is addressed with `[]`, which matches every element. Without
+# `all`, the last match wins; with it, every match is printed as `<index>\t<value>`, the
+# index counting from 1 within the nearest enclosing array. That index is what lets a
+# caller line two paths up against each other — the tool name and the file path of the
+# same call in a PostToolBatch payload sit under different keys and are only related by
+# their position.
 #
 # The unescaping is a left-to-right scan rather than a series of gsubs on purpose. A
 # Windows path arrives as "C:\\new\\file", whose raw text contains the two characters \ and
@@ -57,8 +65,18 @@ function scan_literal(   start, c) {
     return substr(S, start, P - start)
 }
 
-function record(prefix, raw) {
-    if (prefix == key) { RESULT = unescape(raw); FOUND = 1 }
+# A value carrying a newline would break the one-record-per-line pairing `all` mode
+# promises, so it is dropped rather than emitted as two lines. Silence costs a
+# measurement; a corrupted index would pair a tool name against the wrong file.
+function record(prefix, raw,   value, idx) {
+    if (prefix != key) return
+    value = unescape(raw)
+    if (all == "") { RESULT = value; FOUND = 1; return }
+    if (index(value, "\n") > 0) return
+    idx = 0
+    if (ARRAY_DEPTH > 0) idx = ARRAY_IDX[ARRAY_DEPTH]
+    printf "%d\t%s\n", idx, value
+    FOUND = 1
 }
 
 function parse_object(prefix,   c, k) {
@@ -80,17 +98,22 @@ function parse_object(prefix,   c, k) {
     }
 }
 
-function parse_array(prefix,   c) {
+function parse_array(prefix,   c, depth) {
     P++
     skip_ws()
     if (substr(S, P, 1) == "]") { P++; return }
+    ARRAY_DEPTH++
+    depth = ARRAY_DEPTH
+    ARRAY_IDX[depth] = 0
     while (P <= SN) {
+        ARRAY_IDX[depth]++
         parse_value(prefix "[]")
         skip_ws()
         c = substr(S, P, 1)
         P++
-        if (c != ",") return
+        if (c != ",") break
     }
+    ARRAY_DEPTH--
 }
 
 function parse_value(prefix,   c) {
@@ -109,7 +132,8 @@ END {
     SN = length(S)
     P = 1
     FOUND = 0
+    ARRAY_DEPTH = 0
     parse_value("")
-    if (FOUND) printf "%s\n", RESULT
+    if (FOUND && all == "") printf "%s\n", RESULT
     exit FOUND ? 0 : 1
 }

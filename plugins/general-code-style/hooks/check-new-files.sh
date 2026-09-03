@@ -17,6 +17,7 @@ set -u
 require_tools awk git
 
 MAX_FILES=40
+MAX_NAMED=5   # offending files named in the line offering the agent
 
 # The extension filter reads its scope from limits.awk rather than restating it, so the
 # hook and the sweep can never disagree about what counts as a source file.
@@ -61,6 +62,11 @@ records=$(
 advisory=$(printf '%s\n' "$records" | advise_records "")
 [ -n "$advisory" ] || exit 0
 
+# Field 2 is the path in all four record shapes — FILE, LONG, WIDE and NOTE.
+offenders=$(printf '%s\n' "$records" | awk -F'\t' '{ print $2 }' | LC_ALL=C sort -u \
+    | head -n "$MAX_NAMED" | tr '\n' ' ' | sed 's/ $//')
+
 printf '%s\n' "Style advisory (general-code-style) — a file created this turn breaks a style rule. The write already succeeded; address this before moving on:" >&2
 printf '%s\n' "$advisory" | sed 's/^/- /' >&2
+printf '%s\n' "Naming and doc comments are not measured above — both need the code read rather than counted. To cover them, run the \`style-reviewer\` agent over: $offenders" >&2
 exit 2

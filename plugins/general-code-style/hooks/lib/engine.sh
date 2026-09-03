@@ -58,6 +58,18 @@ payload_value() {
     printf '%s' "$PAYLOAD" | awk -f "$ENGINE_LIB/json.awk" -v key="$1" 2>/dev/null
 }
 
+# Every match for a key that runs through an array, as `<index>\t<value>`. The index is
+# what lets two keys from the same array element be lined up against each other.
+payload_values() {
+    printf '%s' "$PAYLOAD" | awk -f "$ENGINE_LIB/json.awk" -v key="$1" -v all=1 2>/dev/null
+}
+
+# Text on stdin, one line of hook JSON out. The limit guards the client's 8000-character
+# cap on additionalContext, leaving room for the escaping to expand what it is given.
+emit_context() {
+    awk -f "$ENGINE_LIB/jsonout.awk" -v event="$1" -v limit=7000
+}
+
 read_payload() {
     PAYLOAD=$(cat)
 }

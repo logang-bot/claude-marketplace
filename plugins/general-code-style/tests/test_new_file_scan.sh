@@ -57,13 +57,23 @@ check "an untracked oversized source file is caught" \
 
 advisory=$(printf '{"cwd":"%s"}' "$WORK/repo" | sh "$HOOK" 2>&1 >/dev/null)
 check "the source file is named" \
-    "$(printf '%s' "$advisory" | grep -c 'src/Big.kt' | tr -d ' ')" "1"
+    "$(printf '%s' "$advisory" | grep '^- ' | grep -c 'src/Big.kt' | tr -d ' ')" "1"
 check "prose is not measured" \
     "$(printf '%s' "$advisory" | grep -c 'notes.md' | tr -d ' ')" "0"
 check "binaries are not measured" \
     "$(printf '%s' "$advisory" | grep -c 'art.png' | tr -d ' ')" "0"
 check "the wording says the write already succeeded" \
     "$(printf '%s' "$advisory" | grep -c 'already succeeded' | tr -d ' ')" "1"
+
+# The measurable rules are covered above; naming and doc comments are not, and the agent is
+# the only thing that covers them. An agent is never launched by a hook, so the advisory has
+# to name it and the files, or the offer costs a round trip to reconstruct.
+check "the agent is offered by name" \
+    "$(printf '%s' "$advisory" | grep -c 'style-reviewer' | tr -d ' ')" "1"
+check "the offer says what it does not measure" \
+    "$(printf '%s' "$advisory" | grep -c 'Naming and doc comments are not measured' | tr -d ' ')" "1"
+check "the offer names the offending file" \
+    "$(printf '%s' "$advisory" | grep 'style-reviewer' | grep -c 'src/Big.kt' | tr -d ' ')" "1"
 
 # --- the guards that keep it from looping or nagging -------------------------
 

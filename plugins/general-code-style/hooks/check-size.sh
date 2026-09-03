@@ -1,35 +1,87 @@
 #!/bin/sh
-# PostToolUse hook: warn when a written file breaks a general-code-style rule.
+# PostToolBatch hook: warn when anything just written breaks a general-code-style rule.
 #
-# Reads the hook payload on stdin, measures the file that was just written, and exits 2
-# with an advisory on stderr when a rule is broken. Exit 2 is what surfaces the message to
-# Claude; the wording makes clear it is advice, not a blocked action. Every unexpected
-# input returns 0, so a malformed payload never interrupts work.
+# Reads the hook payload on stdin, measures the files the batch wrote, and exits 2 with an
+# advisory on stderr when a rule is broken. Exit 2 is what surfaces the message to Claude;
+# the wording makes clear it is advice, not a blocked action. Every unexpected input returns
+# 0, so a malformed payload never interrupts work.
 #
-# Tools disagree about what to call the file they wrote, and an MCP server that writes
-# files picks its own name, so the common spellings are all tried. A write that names no
-# path at all — a shell heredoc, a generator script — is invisible here by construction;
-# check-new-files.sh is what covers those.
+# PostToolBatch fires once after every call in a batch has resolved, which is why the whole
+# batch is measured together: PostToolUse fires per tool and runs concurrently for parallel
+# calls, so five writes in one block produced five separate advisories, each applying the
+# MAX_WARNINGS cap on its own. Here the cap applies once, over the batch.
+#
+# No matcher is set in hooks.json, deliberately. A PostToolBatch matcher has to match every
+# call in the batch, so one Read alongside a Write would skip the hook entirely; the
+# write-tool filter is in lib/batch.awk instead.
+#
+# The single-call payload shape is still handled, so the hook works unchanged if it is ever
+# registered on PostToolUse — which is the fallback if PostToolBatch turns out to be inert
+# on some client.
+#
+# A write that names no path at all — a shell heredoc, a generator script — is invisible
+# here by construction; check-new-files.sh is what covers those.
 
 set -u
 . "$(dirname "$0")/lib/engine.sh"
 require_tools awk
 
-written_path() {
-    for key in tool_input.file_path tool_input.notebook_path tool_input.path \
-               tool_input.filePath; do
+# Tools disagree about what to call the file they wrote, and an MCP server that writes files
+# picks its own name, so the common spellings are all tried, in this order.
+PATH_KEYS='tool_input.file_path tool_input.notebook_path tool_input.path tool_input.filePath'
+
+tag_lines() {
+    awk -v tag="$1" 'BEGIN { FS = OFS = "\t" } { print tag, $0 }'
+}
+
+# Paths from a batch payload, filtered down to the calls that actually wrote something.
+batch_paths() {
+    {
+        payload_values 'tool_calls[].tool_name' | tag_lines NAME
+        for key in $PATH_KEYS; do
+            payload_values "tool_calls[].$key" | tag_lines PATH
+        done
+    } | awk -f "$ENGINE_LIB/batch.awk"
+}
+
+# The single-call shape: the first spelling that names a file.
+single_path() {
+    for key in $PATH_KEYS; do
         found=$(payload_value "$key") || continue
-        [ -n "$found" ] || continue
-        found=$(native_path "$found")
-        [ -f "$found" ] && printf '%s\n' "$found" && return 0
+        [ -n "$found" ] && printf '%s\n' "$found" && return 0
     done
     return 1
 }
 
-read_payload
-target=$(written_path) || exit 0
+existing() {
+    while read -r candidate; do
+        [ -n "$candidate" ] || continue
+        candidate=$(native_path "$candidate")
+        [ -f "$candidate" ] && printf '%s\n' "$candidate"
+    done
+}
 
-advisory=$(measure_records "$target" "$target" | advise_records "in this file")
+read_payload
+case $PAYLOAD in
+    *[!\ \	]*) ;;
+    *) exit 0 ;;
+esac
+
+targets=$(batch_paths | existing)
+[ -n "$targets" ] || targets=$(single_path | existing)
+[ -n "$targets" ] || exit 0
+
+records=$(printf '%s\n' "$targets" | while read -r target; do
+    measure_records "$target" "$target"
+done)
+[ -n "$records" ] || exit 0
+
+# Naming one file is only honest when one file was measured — the same rule
+# check-new-files.sh follows when it caps findings over a set.
+scope=""
+[ "$(printf '%s\n' "$targets" | grep -c .)" = "1" ] && scope="in this file"
+
+advisory=$(printf '%s\n' "$records" | advise_records "$scope")
 [ -n "$advisory" ] || exit 0
 
 printf '%s\n' "Style advisory (general-code-style) — the write succeeded; consider addressing this before moving on:" >&2
