@@ -103,6 +103,15 @@ check "a single-call payload still works" \
 check "a notebook path spelling still works" \
     "$(status_for "{\"tool_input\":{\"notebook_path\":\"$WORK/One.kt\"}}")" "2"
 
+# --- the wording orders the fix ----------------------------------------------
+
+check "it states a required fix, not an advisory" \
+    "$(advisory_for "$batch" | grep -c 'required fix' | tr -d ' ')" "1"
+check "the pre-existing-shape excuse is refused" \
+    "$(advisory_for "$batch" | grep -c 'is not a reason to skip it' | tr -d ' ')" "1"
+check "the order is scoped to the files it names" \
+    "$(advisory_for "$batch" | grep -c 'Only these files' | tr -d ' ')" "1"
+
 # --- bad input is silent -----------------------------------------------------
 
 check "a malformed payload is silent" "$(status_for 'not json')" "0"

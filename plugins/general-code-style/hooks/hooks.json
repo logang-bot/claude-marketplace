@@ -1,5 +1,5 @@
 {
-  "description": "Gives every subagent the style rules, and warns when a written or newly created file or function exceeds the general-code-style size caps",
+  "description": "Gives every subagent the style rules, and requires the files a turn creates, modifies or renames to meet the general-code-style size caps",
   "hooks": {
     "SubagentStart": [
       {
@@ -8,6 +8,18 @@
             "type": "command",
             "shell": "bash",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-rules.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/snapshot-turn.sh\"",
             "timeout": 15
           }
         ]

@@ -84,6 +84,7 @@ scope=""
 advisory=$(printf '%s\n' "$records" | advise_records "$scope")
 [ -n "$advisory" ] || exit 0
 
-printf '%s\n' "Style advisory (general-code-style) — the write succeeded; consider addressing this before moving on:" >&2
+printf '%s\n' "general-code-style — required fix. Your write succeeded, but it leaves these breaking a rule this project enforces. Fix them now, before continuing:" >&2
 printf '%s\n' "$advisory" | sed 's/^/- /' >&2
+printf '%s\n' "That a file was already over the limit before you touched it is not a reason to skip it. You worked on it; bring it under the cap or split it. Only these files — do not go looking for other violations in the project." >&2
 exit 2
