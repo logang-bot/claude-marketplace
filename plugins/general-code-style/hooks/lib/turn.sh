@@ -1,4 +1,5 @@
-# Scopes the Stop hook to the work of one turn.
+# Scopes the Stop hook to the work of one turn, and remembers whether a planning episode has
+# already been given the design budgets.
 #
 # The hook used to ask git what was new and get the same answer every turn: an untracked file
 # stays untracked until someone commits it, so a file the agent had never touched was reported
@@ -85,4 +86,21 @@ turn_candidates() {
       | while read -r _name; do
             [ -f "$_root/$_name" ] && printf '%s\n' "$_root/$_name"
         done | turn_with_sizes
+}
+
+# The other thing worth keeping per session: whether the current planning episode has already
+# been handed the design budgets. Injecting them on every plan-mode prompt would spend the
+# digest again on each turn of a long planning session, and the second copy teaches nothing.
+#
+# An episode runs from the first plan-mode prompt to the ExitPlanMode that ends it, which is
+# where inject-plan-rules.sh removes the marker so a later round of planning is served again.
+#
+# Unlike the snapshot, this state is an optimisation rather than a premise. check-new-files.sh
+# exits 1 when it cannot keep state, because reporting without a baseline means issuing false
+# orders; here the worst a missing marker can do is repeat a digest, so the caller injects
+# anyway rather than falling silent.
+plan_marker_file() {
+    _key=$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_')
+    [ -n "$_key" ] || _key=nosession
+    printf '%s/%s.planned\n' "$TURN_DIR" "$_key"
 }

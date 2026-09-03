@@ -4,12 +4,12 @@
 # A subagent starts with a fresh context and does no description matching against this
 # plugin, so the skills that shape how code is written never reach it. Until now its files
 # were only caught afterwards, by check-new-files.sh, once the work was already done. This
-# is the one part of the plugin that is deterministic rather than advisory: the rules arrive
-# whether or not anything decided they were relevant.
+# is one of the two deterministic injections in the plugin: the rules arrive whether or not
+# anything decided they were relevant. inject-plan-rules.sh is the other, covering the main
+# thread, which does its writing where no SubagentStart ever fires.
 #
-# The rules are read from the plugin's own SKILL.md bodies rather than restated here, so
-# there is one copy to keep right. Every skill in the plugin is included — the directory is
-# the list, the same way the rest of the plugin's components are discovered.
+# Assembling the rules is lib/rules.sh, shared with that hook so there is one copy of the
+# frontmatter stripping and one definition of which skills are included.
 #
 # Injection is unconditional. Gating on agent_type would mean maintaining a list of names
 # for agents this plugin does not own, and such a list fails silently: a new writing agent
@@ -20,41 +20,14 @@
 
 set -u
 . "$(dirname "$0")/lib/engine.sh"
+. "$(dirname "$0")/lib/rules.sh"
 require_tools awk
-
-SKILLS_DIR=$(dirname "$0")/../skills
 
 HEADER='The general-code-style rules below are in force for this task. They apply to every
 file and function you write, including code produced by a shell command, a heredoc, or a
 generator script rather than the file editor, and an already-approved plan does not exempt
 the code it produces. A hook measures them after the fact, so following them now is what
 avoids the rework.'
-
-# Everything after the closing --- of the YAML frontmatter. The frontmatter is activation
-# metadata for the client; the body is the rules. A file that opens with something other
-# than --- has no frontmatter to strip and is passed through whole.
-skill_body() {
-    awk 'NR == 1 && $0 == "---" { state = 1; next }
-         state == 1 && $0 == "---" { state = 2; next }
-         state == 1 { next }
-         { print }' "$1"
-}
-
-rules() {
-    printf '%s\n\n' "$HEADER"
-    for skill in "$SKILLS_DIR"/*/SKILL.md; do
-        [ -f "$skill" ] || continue
-        skill_body "$skill"
-        printf '\n'
-    done
-}
-
-have_skills() {
-    for skill in "$SKILLS_DIR"/*/SKILL.md; do
-        [ -f "$skill" ] && return 0
-    done
-    return 1
-}
 
 read_payload
 case $PAYLOAD in
@@ -64,5 +37,5 @@ esac
 
 have_skills || exit 0
 
-rules | emit_context SubagentStart
+rules "$HEADER" | emit_context SubagentStart
 exit 0

@@ -4,10 +4,10 @@ Hooks are the only part of a plugin that **executes on its own**. Skills, comman
 are markdown instructions that shape what Claude does; a hook is a program the harness runs at a
 fixed point in the loop, whether or not anyone asked.
 
-All six here are POSIX shell for the glue and `awk` for anything that has to read code. They
+All seven here are POSIX shell for the glue and `awk` for anything that has to read code. They
 read the hook payload as JSON on stdin and communicate back through their exit code — except
-`inject-rules.sh`, which answers on stdout in JSON, because injecting context is not something
-an exit code can express.
+`inject-rules.sh` and `inject-plan-rules.sh`, which answer on stdout in JSON, because injecting
+context is not something an exit code can express.
 
 ## Why shell and awk
 
@@ -386,10 +386,11 @@ unwritable `TMPDIR`, and a directory that is not a repository. A missing snapsho
 **Payload keys read:** none beyond a blankness check. The event carries `agent_id` and
 `agent_type`; neither is consulted.
 
-The only part of this repo that is **deterministic rather than advisory**. A subagent starts with
-a fresh context and does no description matching against this plugin, so the skills that shape
-how code gets written never reach it — its files were caught only afterwards, by
-`check-new-files.sh`, once the work was done. This hook hands it the rules before it starts.
+One of the two **deterministic rather than advisory** parts of this repo; `inject-plan-rules.sh`
+is the other, covering the main thread. A subagent starts with a fresh context and does no
+description matching against this plugin, so the skills that shape how code gets written never
+reach it — its files were caught only afterwards, by `check-new-files.sh`, once the work was
+done. This hook hands it the rules before it starts.
 
 It answers on **stdout in JSON**, not through an exit code:
 
@@ -406,6 +407,11 @@ The rules are read from the plugin's own `skills/*/SKILL.md` bodies at runtime, 
 stripped, rather than restated in the script. One copy to keep right, and the directory is the
 list — adding a skill adds it to the injection with no registration, which is how every other
 component here is discovered. It is the same reason `limits.awk` holds the caps alone.
+
+That assembly lives in `lib/rules.sh` rather than in this script, because `inject-plan-rules.sh`
+sends the same bodies under a different header. Only the header differs between them, which is
+the whole reason it is shared: two copies of the frontmatter stripping would be two chances to
+disagree about what a skill body is.
 
 Injection is **unconditional**. Gating on `agent_type` would mean maintaining a list of names for
 agents this plugin does not own, and such a list fails in the silent direction: a new writing
@@ -424,6 +430,95 @@ that happen to be in a `SKILL.md` today.
 
 ---
 
+
+---
+
+## `inject-plan-rules.sh`
+
+**Events:** `UserPromptSubmit` (no matcher) and `PreToolUse` (matcher `ExitPlanMode|Skill`) ·
+**Timeout:** 15s · Plugin: `general-code-style`
+
+**Payload keys read:** `hook_event_name`, `session_id`, `permission_mode`, `tool_name`,
+`tool_input.skill`
+
+`inject-rules.sh` covers subagents. Nothing covered **the main thread**, which is where most
+code is actually written — there the two skills reach the model only by description matching,
+the same probabilistic route that injection exists to replace. So the main conversation wrote
+code against rules it had never been given, and `check-size.sh` and `check-new-files.sh`
+ordered the fix afterwards.
+
+That works, and it is why those two hooks stay. But it pays for correctness in **rework**: a
+300-line file is written, measured, and then split. Planning is where the same correction is
+free, because no code exists yet to refactor. This hook puts the rules there.
+
+### Three triggers, two payloads
+
+| Trigger | Fires on | Injects |
+|---|---|---|
+| A planning turn | `UserPromptSubmit` with `permission_mode` of `plan` | the design budgets |
+| A brainstorming skill | `PreToolUse` on `Skill`, name containing `brainstorm` | the design budgets |
+| The handoff into implementation | `PreToolUse` on `ExitPlanMode` | the full rules |
+
+A plan needs the caps as **constraints to design against** — the numbers, and the instruction
+to plan a split now rather than discover one at write time. The handoff needs the rules
+themselves, and it is the moment the main thread has never had covered: the code is about to
+be written, and an approved plan is exactly the excuse that used to carry an oversized file
+past the rules.
+
+The full-rules payload is the same `skills/*/SKILL.md` assembly `inject-rules.sh` sends, under
+a different header. Both read it through `lib/rules.sh`, so there is one copy of the
+frontmatter stripping and one definition of which skills are included.
+
+### Why `permission_mode` and not `EnterPlanMode`
+
+`permission_mode` is a **base field on every hook payload**, so plan mode is detected however
+it was entered. Matching the `EnterPlanMode` tool instead would miss plan mode entered with
+shift+tab, which fires no tool call at all — a silent gap of exactly the kind this document
+keeps warning about. `ExitPlanMode` is matched as a tool because it genuinely is one, and
+because every plan-mode session leaves through it.
+
+### The episode marker
+
+The digest is injected **once per planning episode**, not once per planning turn. Without
+that, a long plan session would pay for it on every prompt, and the second copy teaches
+nothing. An episode runs from the first plan-mode prompt to the `ExitPlanMode` that ends it,
+where the marker is removed so a later round of planning is served again.
+
+State lives beside the turn snapshot, at
+`${TMPDIR:-/tmp}/general-code-style/<session_id>.planned`, through `plan_marker_file` in
+`lib/turn.sh` — the same scrubbing of a payload-supplied session id into a filename-safe key.
+
+**It degrades toward injecting.** Where `check-new-files.sh` exits `1` when it cannot keep
+state, this hook carries on. The asymmetry is deliberate: reporting without a baseline means
+issuing **false orders**, while injecting without a marker means **a repeated digest**. One is
+a correctness failure and the other is a rounding error, so they get opposite defaults.
+
+### `exit 2` is unavailable on both events
+
+On `UserPromptSubmit` it blocks the user's own prompt. On `PreToolUse` it blocks the tool call
+— and blocking `ExitPlanMode` would make plan mode unusable. There is no injection failure
+worth either, so **every path returns `0`**, including a missing skill directory, a malformed
+payload, and an unwritable `TMPDIR`.
+
+### Inert where it does not apply
+
+The `Skill` matcher fires on **every** skill call in every project the plugin is installed
+into; only the name test decides whether anything is emitted. A project with no brainstorming
+plugin therefore sees a hook that reads its payload and exits silently. The substring match is
+what makes that work without naming a plugin: a skill arrives as `plugin:skill`, and this
+plugin has no business maintaining a list of the plugins that might provide one.
+
+### The risk worth naming
+
+`PreToolUse` accepting `additionalContext` is confirmed in the 2.1.259 output schema, but a
+client that ignores it drops the injection **with no signal** — the same silent-degradation
+class named under `check-size.sh`. Two things blunt it: the `UserPromptSubmit` trigger uses a
+long-established channel, and the two corrective hooks still catch whatever slips through. The
+plan-time injection is an optimisation over the safeguard, never a replacement for it.
+
+Fixtures are in `plugins/general-code-style/tests/test_plan_rules.sh`, which redirects
+`TMPDIR` — the episode marker is real on-disk state, and a suite that wrote to the developer's
+own `TMPDIR` would suppress the injection in their next session.
 ## The measurement engine
 
 Every number the style hooks report comes from `general-code-style/hooks/lib/`, a set of awk
@@ -453,6 +548,7 @@ awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" \
 | `json.awk` | Scalars out of a hook payload, by dotted path; `all=1` for every match in an array |
 | `jsonout.awk` | Text in, one line of `additionalContext` hook JSON out |
 | `batch.awk` | Pairs tool names with paths in a batch, keeping only the calls that wrote |
+| `budget.awk` | The caps as design constraints, for injection while work is being planned |
 
 `measure.awk` prints **records, not sentences**, because the hooks and the sweep need the same
 numbers in different shapes:
@@ -504,8 +600,15 @@ before the search, so a `//` inside a URL is not a comment.
 `tests/probe.awk` loads them to print the raw measurements a fixture asserts on.
 
 `lib/turn.sh` sits beside them but is shell rather than awk, because its work is filesystem and
-git rather than parsing: it holds the snapshot format, the turn boundary, and `turn_candidates`,
-the one definition of what the two turn-aware hooks consider a candidate.
+git rather than parsing: it holds the snapshot format, the turn boundary, `turn_candidates` —
+the one definition of what the two turn-aware hooks consider a candidate — and `plan_marker_file`,
+the planning-episode equivalent. `lib/rules.sh` is shell for the same reason: assembling the
+skill bodies is directory globbing, and only the frontmatter strip inside it is awk.
+
+`budget.awk` reads its numbers from `limits.awk` rather than restating them, for the reason the
+injection hooks read `SKILL.md` rather than restating the rules: raising a cap should reach every
+consumer from one edit. Its `BEGIN` is guarded behind `-v emit=1` so that loading the modules as
+a set — which CI does — neither prints nor short-circuits a sibling's `END`.
 
 ### Reading a payload without a JSON parser
 
@@ -547,7 +650,12 @@ parse.
 6. Add fixtures covering both must-block and must-pass, per the pattern above.
 7. Check what `exit 2` means on your event before relying on it — it blocks on `PreToolUse` and
    `Stop`, is advice on `PostToolUse` and `PostToolBatch`, and on `UserPromptSubmit` would block
-   the user's own prompt, which is never what you want.
+   the user's own prompt, which is never what you want. A hook that only injects context wants
+   `0` on every path: it has nothing to prevent, and on `PreToolUse` a `2` would take the tool
+   call down with it.
+8. If it injects context, emit through `emit_context <EventName>` and name **the event that
+   fired**. The client rejects output whose `hookEventName` does not match the hook it names, and
+   the rejection is a log line, not a failure you will notice.
 
 `sh -n` is the floor, not the test — it proves the file parses, not that the logic is right, and
 a hook that parses but misjudges will fail silently in the direction of allowing things.

@@ -1,5 +1,5 @@
 {
-  "description": "Gives every subagent the style rules, and requires the files a turn creates, modifies or renames to meet the general-code-style size caps",
+  "description": "Gives the main thread and every subagent the style rules before code is written — while a plan is being made, and at the handoff into implementation — and requires the files a turn creates, modifies or renames to meet the general-code-style size caps",
   "hooks": {
     "SubagentStart": [
       {
@@ -13,6 +13,19 @@
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "ExitPlanMode|Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-plan-rules.sh\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
@@ -20,6 +33,12 @@
             "type": "command",
             "shell": "bash",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/snapshot-turn.sh\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-plan-rules.sh\"",
             "timeout": 15
           }
         ]

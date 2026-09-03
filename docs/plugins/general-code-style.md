@@ -18,8 +18,12 @@ restating it.
 | Command | `/style-check [path] [--sweep]` | Run explicitly |
 | Command | `/design-review [path]` | Run explicitly |
 | Command | `/leak-check [path] [--report-only]` | Run explicitly |
-| Hook | `PostToolUse` on `Write\|Edit\|MultiEdit\|NotebookEdit` | After every write that names a file |
-| Hook | `Stop` | At end of turn, over files git reports as new — whatever tool created them |
+| Hook | `SubagentStart` | A subagent starts — hands it the rules its context does not carry |
+| Hook | `UserPromptSubmit` in plan mode | A planning turn begins — hands the main thread the caps |
+| Hook | `PreToolUse` on `ExitPlanMode\|Skill` | A plan is accepted, or a brainstorming skill runs |
+| Hook | `UserPromptSubmit` | Snapshots the tree, so the `Stop` hook can scope itself to the turn |
+| Hook | `PostToolBatch` | After a batch of writes, over the files that named a path |
+| Hook | `Stop` | At end of turn, over the files git reports the turn worked on |
 | Script | `scripts/sweep.sh` | Via `/style-check` on a large target, or run directly |
 | Modules | `hooks/lib/*.awk` | Loaded by the hooks, the sweep, and the tests |
 | Tests | `tests/test_*.sh` | In CI, and before pushing a measurement change |
@@ -86,6 +90,30 @@ The exemption is honoured in three places, and they must agree:
   (`@Composable`, `@Preview`, `React.FC`, `: FC<`, `some View`)
 
 File length is **not** exempt for UI code. A 400-line screen file is still a finding.
+
+## The rules arrive before the code, not only after it
+
+Two of the hooks **inject** rather than measure. Every other component here is advisory —
+a skill fires if its description matches, an agent runs if someone asks for it — and
+description matching is probabilistic. Injection is not.
+
+- `hooks/inject-rules.sh` (`SubagentStart`) hands the rules to every subagent, which starts
+  with a fresh context and matches no descriptions at all.
+- `hooks/inject-plan-rules.sh` covers **the main thread**, which does most of the writing and
+  had no deterministic injection before. It sends the caps as design constraints when a
+  planning turn begins (`UserPromptSubmit` with `permission_mode` of `plan`) or a brainstorming
+  skill runs, and the full rules at the handoff into implementation (`PreToolUse` on
+  `ExitPlanMode`).
+
+The point is where the correction is cheapest. Measuring after the fact is correct, but it is
+paid for in rework: a 300-line file gets written, measured, and then split. During planning
+there is nothing to refactor yet, so the same correction costs a paragraph. The digest is sent
+**once per planning episode** rather than once per turn, and the episode ends at the
+`ExitPlanMode` that closes it.
+
+This does not replace the measuring hooks and is not allowed to. Injection makes a violation
+less likely; only the hooks below make it visible. See [../hooks.md](../hooks.md) for the
+triggers, the episode marker, and the client-support risk.
 
 ## The size hook
 

@@ -50,8 +50,10 @@ Language-agnostic. Install everywhere.
 | Command | `/design-review [path]` | Runs the design review over a diff or a module |
 | Command | `/leak-check [path] [--report-only]` | Hunts and fixes leaks; `--report-only` reviews without editing |
 | Script | `scripts/sweep.sh` | Measures a whole tree against the size rules, no model involved |
-| Hook | `PostToolUse` | Warns when a written file or function exceeds the caps, or takes too many parameters |
-| Hook | `Stop` | Measures files git reports as new, catching writes made by a shell command or another tool |
+| Hook | `SubagentStart` | Hands every subagent the rules, since a fresh context matches no skill descriptions |
+| Hook | `UserPromptSubmit`, `PreToolUse` | Hands the main thread the caps while it plans, and the rules when the plan is accepted |
+| Hook | `PostToolBatch` | Requires a fix when a written file or function exceeds the caps, or takes too many parameters |
+| Hook | `Stop` | Measures the files git reports the turn worked on, catching writes made by a shell command or another tool |
 
 UI component functions (Compose composables, React components, SwiftUI views) are exempt from
 the body-length and parameter rules — and from those two only — in both the skill and the hook.
@@ -140,7 +142,7 @@ Deeper reference lives in [`docs/`](docs/):
 | [`docs/plugins/`](docs/plugins/) | One page per plugin — every skill, command, agent, and hook |
 | [`docs/architecture.md`](docs/architecture.md) | Discovery chain, consumer settings, install pinning and updates |
 | [`docs/authoring.md`](docs/authoring.md) | Frontmatter reference and how to add a component |
-| [`docs/hooks.md`](docs/hooks.md) | The four hooks, the exit-code contract, how to test one |
+| [`docs/hooks.md`](docs/hooks.md) | Every hook, the exit-code contract, how to test one |
 | [`docs/testing-and-ci.md`](docs/testing-and-ci.md) | Local checks, what `validate.yml` covers, release steps |
 
 ## License
