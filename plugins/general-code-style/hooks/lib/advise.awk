@@ -24,6 +24,7 @@ $1 == "FILE" && $3 + 0 > FILE_LIMIT { add_finding(file_warning($2, $3)) }
 $1 == "LONG" { add_finding(length_warning($2, $3, $4, $5)) }
 $1 == "WIDE" { add_finding(parameter_warning($2, $3, $4, $5)) }
 $1 == "NOTE" { add_finding(comment_warning($2, $3, note_text())) }
+$1 == "ORDER" { add_finding(order_warning($2, $3, $4, $5)) }
 
 END {
     for (i = 1; i <= FOUND_N && i <= MAX_WARNINGS; i++) print FOUND[i]

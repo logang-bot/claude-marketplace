@@ -34,6 +34,22 @@ function init_limits(   t, n, i) {
     n = split("kt kts swift go rs js jsx ts tsx php scala dart gradle groovy", t, " ")
     for (i = 1; i <= n; i++) KEYWORD[t[i]] = 1
 
+    # Languages whose member order is measured. Narrower than BRACE on purpose: every check
+    # reads a visibility keyword off a declaration, so a language that has none cannot be
+    # measured honestly. js/jsx, go and dart have no visibility keywords, rs puts `pub` on
+    # items in an impl block, the C family uses `public:` section labels — a different shape
+    # entirely — and py has only the leading-underscore convention. Adding one here means its
+    # fields must match property_at() first.
+    n = split("kt kts java cs ts tsx swift php scala", t, " ")
+    for (i = 1; i <= n; i++) ORDERED[t[i]] = 1
+
+    # Class members with no declaration keyword to key on. blocks.awk cannot see these:
+    # decl_name() needs fun/func/function, and typed_name() is not consulted for a KEYWORD
+    # language. The member walk recognises them itself, which is only safe because it runs at
+    # depth 1 of a type body, where a control-flow line cannot appear.
+    n = split("ts tsx", t, " ")
+    for (i = 1; i <= n; i++) IMPLICIT_METHOD[t[i]] = 1
+
     n = split("@Composable|@Preview|React.FC|: FC<|some View", t, "|")
     UI_N = n
     for (i = 1; i <= n; i++) UI_MARKERS[i] = t[i]

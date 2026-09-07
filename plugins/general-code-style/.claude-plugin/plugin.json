@@ -1,7 +1,7 @@
 {
   "name": "general-code-style",
-  "description": "Language-agnostic style rules for file, class, and function size, parameter counts, self-describing names, and comment discipline.",
-  "version": "0.11.0",
+  "description": "Language-agnostic style rules for file, class, and function size, parameter counts, member declaration order, self-describing names, and comment discipline.",
+  "version": "0.12.0",
   "author": {
     "name": "logang-bot"
   },

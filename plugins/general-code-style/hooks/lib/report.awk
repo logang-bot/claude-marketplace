@@ -15,11 +15,12 @@ function relative(path) {
     return path
 }
 
-# Structural problems first, then the worst body, then the widest signature. Each
+# Structural problems first, then the worst body, then the widest signature, and ordering
+# last — a member in the wrong place is the cheapest of these to put right. Each
 # component is zero-padded to a fixed width so one string compare ranks the whole tuple,
 # and the leading "s" keeps awk from reading an all-digit key as a number.
 function severity(i) {
-    return sprintf("s%08d%08d%08d%08d", over_by(i), LMAX[i], WMAX[i], NN[i])
+    return sprintf("s%08d%08d%08d%08d%08d", over_by(i), LMAX[i], WMAX[i], NN[i], ON[i])
 }
 
 function over_by(i) {
@@ -27,7 +28,7 @@ function over_by(i) {
 }
 
 function flagged(i) {
-    return (LINES[i] > FILE_LIMIT || LN[i] > 0 || WN[i] > 0 || NN[i] > 0)
+    return (LINES[i] > FILE_LIMIT || LN[i] > 0 || WN[i] > 0 || NN[i] > 0 || ON[i] > 0)
 }
 
 function describe(i,   out, k) {
@@ -36,6 +37,7 @@ function describe(i,   out, k) {
     for (k = 1; k <= LN[i]; k++) out = (out == "") ? LDESC[i, k] : out " · " LDESC[i, k]
     for (k = 1; k <= WN[i]; k++) out = (out == "") ? WDESC[i, k] : out " · " WDESC[i, k]
     for (k = 1; k <= NN[i]; k++) out = (out == "") ? NDESC[i, k] : out " · " NDESC[i, k]
+    for (k = 1; k <= ON[i]; k++) out = (out == "") ? ODESC[i, k] : out " · " ODESC[i, k]
     return relative(PATHS[i]) "  ·  " out
 }
 
@@ -57,12 +59,13 @@ $1 == "WIDE" {
     if ($5 + 0 > WMAX[i]) WMAX[i] = $5 + 0
 }
 $1 == "NOTE" { i = file_index($2); NN[i]++; NDESC[i, NN[i]] = "comment at :" $3 }
+$1 == "ORDER" { i = file_index($2); ON[i]++; ODESC[i, ON[i]] = $3 " out of order at :" $4 }
 
 END {
-    over = 0; longs = 0; wides = 0; notes = 0; found = 0
+    over = 0; longs = 0; wides = 0; notes = 0; orders = 0; found = 0
     for (i = 1; i <= NFILES; i++) {
         if (LINES[i] > FILE_LIMIT) over++
-        longs += LN[i]; wides += WN[i]; notes += NN[i]
+        longs += LN[i]; wides += WN[i]; notes += NN[i]; orders += ON[i]
         if (flagged(i)) { found++; SEV[found] = severity(i); RIDX[found] = i }
     }
     # Severity alone decides the order; files that tie keep the order they were
@@ -73,13 +76,14 @@ END {
         SEV[b + 1] = key; RIDX[b + 1] = at
     }
 
-    print "Swept " SCANNED + 0 " files in " root " · size, parameter, and in-body comment" \
-          " rules (naming not evaluated)"
+    print "Swept " SCANNED + 0 " files in " root " · size, parameter, member-order, and" \
+          " in-body comment rules (naming and call order not evaluated)"
     print ""
     print "  " over " files over the " FILE_LIMIT "-line cap"
     print "  " longs " functions over the " FUNCTION_LIMIT "-line body cap"
     print "  " wides " signatures over " PARAM_LIMIT " parameters"
     print "  " notes " comments explaining code inside a body"
+    print "  " orders " members declared out of order"
 
     if (found == 0) { print ""; print "Nothing over the caps."; exit 0 }
 

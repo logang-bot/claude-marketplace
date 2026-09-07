@@ -10,6 +10,7 @@
 #   LONG                ->  LONG:<function name>
 #   WIDE                ->  WIDE:<function name>
 #   NOTE                ->  NOTE:<comment text>
+#   ORDER               ->  ORDER:<reason>:<member name>
 #
 # Names rather than positions, and counted rather than matched: two overloads of the same name
 # both too long give the key a count of 2, so a turn that adds a third is caught while a turn
@@ -43,6 +44,7 @@ function key_of(   type) {
     if (type == "LONG") return "LONG:" key_clean($3)
     if (type == "WIDE") return "WIDE:" key_clean($3)
     if (type == "NOTE") return "NOTE:" key_clean(key_note())
+    if (type == "ORDER") return "ORDER:" $5 ":" key_clean($3)
     return ""
 }
 

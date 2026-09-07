@@ -1,6 +1,6 @@
 ---
 name: style-check
-description: Reviews code against the file-size, function-size, parameter-count, naming, and comment rules, in agent mode for a diff or small path and mechanical sweep mode for a large tree. Use when asked to check style compliance or audit a codebase against these conventions.
+description: Reviews code against the file-size, function-size, parameter-count, member-order, naming, and comment rules, in agent mode for a diff or small path and mechanical sweep mode for a large tree. Use when asked to check style compliance or audit a codebase against these conventions.
 argument-hint: "[path] [--sweep] [--dirty]"
 ---
 
@@ -25,7 +25,7 @@ Say which mode you picked and why in one line before you run it.
 
 Launch the `style-reviewer` agent against the path, or tell it to review the uncommitted
 working tree (`git diff --name-only HEAD` plus `git ls-files --others --exclude-standard`) if
-no path was given. It covers all five rules and is read-only.
+no path was given. It covers all seven rules and is read-only.
 
 Relay its findings grouped by file, most severe first.
 
@@ -44,10 +44,12 @@ Print the report as it comes back. Do not re-rank it, re-summarise it, or re-mea
 yourself — it is already ordered by severity and capped, and it reads its limits from the same
 file the size hook uses.
 
-Then state plainly, in one line, what the sweep did not cover: it measures the size and
-parameter rules and flags comments that explain code inside a function body, but **naming** is
-not evaluated, and neither is whether a doc comment says something its member's name already
-says. Both need a reading of the code rather than a measurement of it.
+Then state plainly, in one line, what the sweep did not cover: it measures the size,
+parameter and member-order rules and flags comments that explain code inside a function
+body, but **naming** is not evaluated, nor **call order**, nor whether a doc comment says
+something its member's name already says. Member order is measured only for Kotlin, Java,
+C#, TypeScript, Swift, PHP and Scala — the languages with a visibility keyword to read.
+The rest need a reading of the code rather than a measurement of it.
 
 Finally, offer the next step and stop: ask whether to review one of the listed files with the
 `style-reviewer` agent, which does cover those remaining judgement calls.

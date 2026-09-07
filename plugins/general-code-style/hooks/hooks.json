@@ -1,5 +1,5 @@
 {
-  "description": "Gives the main thread and every subagent the style rules before code is written — while a plan is being made, at the handoff into implementation, and before the first write of any session — then reports what a request introduces: function, parameter and comment findings as fixes to make at the write, file size as something for the user to decide",
+  "description": "Gives the main thread and every subagent the style rules before code is written — while a plan is being made, at the handoff into implementation, and before the first write of any session — then reports what a request introduces: function, parameter, member-order and comment findings as fixes to make at the write, file size as something for the user to decide",
   "hooks": {
     "SubagentStart": [
       {

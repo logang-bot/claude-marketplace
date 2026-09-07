@@ -7,6 +7,7 @@
 #   LONG <path> <name> <line> <body>      a body over FUNCTION_LIMIT
 #   WIDE <path> <name> <line> <params>    a signature over PARAM_LIMIT
 #   NOTE <path> <line> <text>             an explanatory comment inside a body
+#   ORDER <path> <name> <line> <reason>   a member declared out of its place in the type
 #
 # Call with -v path=<display path> -v ext=<extension, no dot>.
 
@@ -35,4 +36,8 @@ END {
     comment_findings(ext)
     for (k = 1; k <= CN; k++)
         print "NOTE", path, CLINE[k], CTEXT[k]
+
+    iter_members(path, ext)
+    for (k = 1; k <= OD_N; k++)
+        print "ORDER", OD_PATH[k], OD_NAME[k], OD_LINE[k], OD_REASON[k]
 }

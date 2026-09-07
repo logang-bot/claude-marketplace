@@ -87,6 +87,8 @@ check "ExitPlanMode names PreToolUse in the envelope" \
 check "the file rule is included" "$(grep_count 'Keep files short' "$HANDOFF")" "1"
 check "the parameter rule is included" "$(grep_count 'Limit the number of parameters' "$HANDOFF")" "1"
 check "the comment rule is included" "$(grep_count 'Never explain code with inline comments' "$HANDOFF")" "1"
+check "the member-order rule is included" "$(grep_count 'Declare members in a fixed order' "$HANDOFF")" "1"
+check "the call-order rule is included" "$(grep_count 'Place a method below the one that calls it' "$HANDOFF")" "1"
 check "shell-written code is named as in scope" "$(grep_count 'generator script' "$HANDOFF")" "1"
 check "the approved plan is refused as an excuse" \
     "$(grep_count 'does not exempt the code it produces' "$HANDOFF")" "1"

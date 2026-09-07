@@ -154,6 +154,39 @@ check "one cap over the whole set, not one per file" \
 check "the overflow line does not claim one file" \
     "$(printf '%s' "$RUN_TEXT" | grep -c 'more findings in this file' | tr -d ' ')" "0"
 
+# --- an ordering finding reaches the hook ------------------------------------
+
+# The whole path in one case: measured by members.awk, given an identity by keys.awk, judged new
+# by introduced.awk, and routed as a fix rather than as a file-size report. A missing key_of()
+# case would break only this — the sweep would still show the finding, and the hook would not.
+
+begin_turn a4
+cat > "$WORK/repo/src/Order.kt" <<'EOF'
+package a.b
+
+class Order {
+    fun submit() {
+        check()
+    }
+
+    private val late = 3
+
+    private fun check() {
+        verify()
+    }
+}
+EOF
+run_hook a4
+
+check "a member out of order reaches the hook" \
+    "$(printf '%s' "$RUN_TEXT" | grep -c 'property `late`' | tr -d ' ')" "1"
+check "and is asked for as a fix, not reported as a size" \
+    "$(printf '%s' "$RUN_TEXT" | grep -c 'Fix them before you finish' | tr -d ' ')" "1"
+
+run_hook a4
+check "and is not repeated once it has been said" \
+    "$(printf '%s' "$RUN_TEXT" | grep -c 'property `late`' | tr -d ' ')" "0"
+
 # --- results -----------------------------------------------------------------
 
 if [ "$FAILURES" -eq 0 ]; then

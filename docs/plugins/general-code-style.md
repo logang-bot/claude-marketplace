@@ -10,7 +10,7 @@ restating it.
 
 | Kind | Name | Fires when |
 |---|---|---|
-| Skill | `creating-files-or-classes` | A file or class is being created |
+| Skill | `creating-files-or-classes` | A file or class is being created, or a member is placed in one |
 | Skill | `creating-methods-or-functions` | A method or function is being written |
 | Agent | `style-reviewer` | Asked to check style, or after a batch of new code |
 | Agent | `senior-reviewer` | Asked for a design or architecture review, or before a refactor |
@@ -29,7 +29,7 @@ restating it.
 | Modules | `hooks/lib/*.awk` | Loaded by the hooks, the sweep, and the tests |
 | Tests | `tests/test_*.sh` | In CI, and before pushing a measurement change |
 
-## The size and naming rules
+## The size, order, and naming rules
 
 | Rule | Target | Hard cap |
 |---|---|---|
@@ -49,6 +49,57 @@ explain what a thing does, the name is wrong.
 Beyond three parameters, group the related extras into a data class — or the equivalent record,
 struct, or interface in the language at hand. Group only fields genuinely related to each other;
 a bag named `Params` that holds unrelated values is not an improvement.
+
+
+## Member order
+
+A type reads top to bottom, so where a member sits is part of how it reads. Three rules fix it,
+and they are stated as one so they cannot drift apart:
+
+| Rule | What it says |
+|---|---|
+| Blocks | Properties, then constructors, then methods. Never a property between two methods. |
+| Visibility tiers | Inside each block: public, then internal, then protected, then private. |
+| Call order | Inside each tier: a helper directly below its caller, depth first. |
+
+The third one exists because of the second cap on this page. A ~7-line body cap manufactures
+small private helpers by design, and with nothing saying where they go they land in the order
+they were typed — so a class becomes a bag of helpers and the reader has to search for the one
+that matters. Depth first means that if `submit()` calls `a()` and then `b()`, and `a()` calls
+`a1()`, the order is `submit, a, a1, b`: each helper's own subtree finishes before its sibling
+begins.
+
+Visibility and call order look like they contradict each other — one wants the private helper at
+the bottom, the other wants it directly under its caller — and the split is what settles it.
+**Visibility decides the block; call order decides the sequence inside the block.** A class ends
+up with its public API gathered at the top and a private block below that still reads top-down.
+
+**The first two are measured. The third never is.** Call order needs a call graph, and this
+engine reads lines rather than syntax: it cannot tell `this.charge()` from `gateway.charge()`, or
+a method name inside a string literal from a call to it. A guessed graph would invent findings,
+and on this page an invented finding costs more than a missed one — so the rule ships in the
+skills and in `style-reviewer`, and `members.awk` does not attempt it.
+
+Two shapes are explicitly not findings, because a check that fires on them is a check nobody
+reads:
+
+- **The backing-property pair.** `private val _state` followed by `val state = _state.asStateFlow()`
+  is public-after-private on purpose, and it is the most common shape in the stack this
+  marketplace ships beside. A property that references a more restricted one declared directly
+  above it is the same member exposed, not a member out of order. The test asserts identifier
+  matching rather than substring matching, so `val b = 2` is not read as a reference to a
+  property called `a`.
+- **A constructor between the fields and the methods.** `typed_name()` already matches
+  `public Foo(int a) {`, so without constructor classification every field below a constructor
+  would be reported. Member classification recognises one by its name matching the enclosing
+  type, or by `constructor` / `init` / `__construct` / `__init__`.
+
+A Kotlin `companion object` at the bottom of a class is quiet for a structural reason rather
+than a carve-out: nested blocks are stepped over whole, so its contents are never examined and
+never mixed into the parent's member list. The same is true of a nested class.
+
+Member order is **ordered** rather than reported — moving a declaration is local, mechanical, and
+complete at the write, which is the same test function length and parameter count pass.
 
 ## Comments and documentation
 
@@ -125,8 +176,9 @@ a heredoc, a `sed -i`, a generator script, an MCP server. Both answer on stdout 
 `additionalContext`, which reaches the model as feedback; neither blocks anything, and neither is
 rendered as an error.
 
-They check four things: file length, function body length, parameter count, and comments that
-explain code inside a function body. **Two rules govern how each one is delivered.**
+They check five things: file length, function body length, parameter count, member
+declaration order, and comments that explain code inside a function body. **Two rules
+govern how each one is delivered.**
 
 **Only what the turn introduced is reported.** A violation that was already in the file before the
 work started is not the turn's to answer for. Editing one line of a file that has been 300 lines
@@ -162,9 +214,20 @@ Three tiers, all defined in `hooks/lib/limits.awk`:
 
 | Tier | Contents | Rules applied |
 |---|---|---|
-| `MEASURED` | `BRACE` (Kotlin/`.kts`, Java, JS/TS, Swift, C/C++, C#, Go, Rust, Scala, PHP, Dart, Gradle, Groovy) plus Python | All of them |
+| `MEASURED` | `BRACE` (Kotlin/`.kts`, Java, JS/TS, Swift, C/C++, C#, Go, Rust, Scala, PHP, Dart, Gradle, Groovy) plus Python | Size, parameters, comments |
 | `FILE_ONLY` | Ruby, shell, awk, SQL, Obj-C, `.vue`, `.svelte`, Lua, Perl, R, Julia, Elixir, Erlang, Haskell, Clojure, Terraform, and friends | File length only |
-| `SOURCE` | The union of the two | The scope of both the hook and the sweep |
+| `ORDERED` | Kotlin/`.kts`, Java, C#, TS/TSX, Swift, PHP, Scala | Member order, on top of those |
+| `SOURCE` | The union of `MEASURED` and `FILE_ONLY` | The scope of both the hook and the sweep |
+
+`ORDERED` is a subset of `MEASURED` rather than a fourth tier. Every ordering check reads a
+visibility keyword off a declaration, so a language that has none cannot be measured honestly:
+JS/JSX, Go and Dart have no visibility keywords, Rust puts `pub` on items inside an `impl`
+block, the C family uses `public:` section labels — a different shape entirely — and Python has
+only the leading-underscore convention. TypeScript needs one extra thing: its class methods
+carry no declaration keyword, so `decl_name()` cannot see them and `typed_name()` is never
+consulted for a `KEYWORD` language. `IMPLICIT_METHOD` names the extensions where the member walk
+recognises them itself, which is safe only because it runs at depth 1 of a type body, where a
+control-flow line cannot appear.
 
 `FILE_ONLY` exists because no body strategy fits those languages: Ruby needs `def`/`end`
 matching, `.vue` and `.svelte` mix markup with script, and the rest are simply languages the
@@ -216,10 +279,10 @@ nothing it reviews the uncommitted working tree (`git diff --name-only HEAD` plu
 `git ls-files --others --exclude-standard`).
 
 It reports the measurement rather than an impression — "148-line body", not "quite long" — and
-is told to be firm on rules 1–3 because they are mechanical, but to raise the naming and comment
-rules only when it can name what a reader would actually misunderstand, or the rename that would
-remove the need for the comment. It is explicitly instructed not to manufacture findings to fill
-a report.
+is told to be firm on rules 1–3 and 6 because they are mechanical, but to raise the naming,
+comment, and call-order rules only when it can name what a reader would actually
+misunderstand, or the rename that would remove the need for the comment. It is explicitly
+instructed not to manufacture findings to fill a report.
 
 ### `senior-reviewer`
 
@@ -286,18 +349,19 @@ on a tree that already holds uncommitted work.
 
 | Target | Mode | Rules covered |
 |---|---|---|
-| No path — the uncommitted working tree | Agent review | All five |
-| A path of 30 files or fewer | Agent review | All five |
-| A path over 30 files | Sweep | 1–3, plus in-body comments |
-| `--sweep <path>` | Sweep, at any size | 1–3, plus in-body comments |
+| No path — the uncommitted working tree | Agent review | All seven |
+| A path of 30 files or fewer | Agent review | All seven |
+| A path over 30 files | Sweep | 1–3 and 6, plus in-body comments |
+| `--sweep <path>` | Sweep, at any size | 1–3 and 6, plus in-body comments |
 
 The threshold exists because the agent *reads* code, and reading is what costs. Past roughly
 thirty files it exhausts its context before finishing, so the command measures instead.
 
-Sweep mode states explicitly what it did not evaluate: **naming**, and whether a doc comment
-says something its member's name already says. Those two need a judgement about what a reader
-would misunderstand, which is not a thing a script can measure. The rest of rule 5 — a comment
-that narrates code inside a body — is mechanical, and is measured.
+Sweep mode states explicitly what it did not evaluate: **naming**, **call order**, and
+whether a doc comment says something its member's name already says. Those three need a
+judgement about what a reader would misunderstand, which is not a thing a script can
+measure. The rest of rule 5 — a comment that narrates code inside a body — is mechanical,
+and is measured, as is member order in the `ORDERED` languages.
 
 Neither mode applies fixes. A sweep is a worklist, not a task queue — if you ask for fixes
 afterwards, they happen one file at a time.

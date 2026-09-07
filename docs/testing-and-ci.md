@@ -65,7 +65,7 @@ the load-bearing one: a comment check that flags `TODO`, a licence header, a `//
 or a Python docstring would make the hook unusable noise, and a parameter counter that miscounts
 a trailing comma or a `Map<String, Int>` invents findings that are not there.
 
-The style hooks are covered by four more suites, split by what they are asking about rather than
+The style hooks are covered by five more suites, split by what they are asking about rather than
 by which script they drive:
 
 | Suite | Asks |
@@ -74,6 +74,7 @@ by which script they drive:
 | `test_new_file_scan.sh` | With the request primed so everything is its work: filtering, capping, routing, and the guards |
 | `test_batch_scan.sh` | A batch measured once, a read kept out of it, and the same file written three times reported once |
 | `test_sweep_scope.sh` | What `--dirty` looks at, and that `--strict` fails while something is over the cap |
+| `test_member_order.sh` | Whether a member is in the right place, and — the load-bearing half — whether the idiomatic shapes stay quiet |
 
 Two things about these are easy to get wrong when adding a case. Each hook **records what it has
 already said**, so a scenario must be run once and asserted against afterwards — calling the hook

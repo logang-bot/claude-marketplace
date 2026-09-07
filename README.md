@@ -41,9 +41,9 @@ Language-agnostic. Install everywhere.
 
 | Component | Name | What it does |
 |---|---|---|
-| Skill | `creating-files-or-classes` | ~200-line file cap, split when approaching it, self-describing names |
-| Skill | `creating-methods-or-functions` | ~7-line bodies, max 3 parameters, intent-revealing names, no explanatory comments |
-| Agent | `style-reviewer` | Read-only review against the size, parameter, naming, and comment rules |
+| Skill | `creating-files-or-classes` | ~200-line file cap, split when approaching it, self-describing names, properties before constructors before methods |
+| Skill | `creating-methods-or-functions` | ~7-line bodies, max 3 parameters, intent-revealing names, no explanatory comments, each helper below its caller |
+| Agent | `style-reviewer` | Read-only review against the size, parameter, member-order, naming, and comment rules |
 | Agent | `senior-reviewer` | Read-only design review — cohesion, coupling, leaky abstractions, testability |
 | Agent | `leak-hunter` | Finds leaked resources across every lifecycle and fixes them, reporting each edit |
 | Command | `/style-check [path] [--sweep]` | Reviews a diff or small path with the agent; sweeps a large one mechanically |
@@ -52,7 +52,7 @@ Language-agnostic. Install everywhere.
 | Script | `scripts/sweep.sh` | Measures a whole tree against the size rules, no model involved |
 | Hook | `SubagentStart` | Hands every subagent the rules, since a fresh context matches no skill descriptions |
 | Hook | `UserPromptSubmit`, `PreToolUse` | Hands the main thread the caps while it plans, and the rules when the plan is accepted |
-| Hook | `PostToolBatch` | Requires a fix when a written file or function exceeds the caps, or takes too many parameters |
+| Hook | `PostToolBatch` | Requires a fix when a written file or function exceeds the caps, takes too many parameters, or declares a member out of order |
 | Hook | `Stop` | Measures the files git reports the turn worked on, catching writes made by a shell command or another tool |
 
 UI component functions (Compose composables, React components, SwiftUI views) are exempt from

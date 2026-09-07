@@ -52,9 +52,9 @@ them now is what avoids the rework.'
 WRITE_HEADER='The general-code-style rules below govern the file you are about to write, and
 every file and function you write after it in this session — including code produced by a shell
 command, a heredoc, or a generator script rather than the file editor. Function length,
-parameter count and comment discipline are measured after each write and you will be asked to
-fix them. File length is measured too, but splitting a file afterwards is expensive, so the
-place to get it right is here, before the file exists.'
+parameter count, member order and comment discipline are measured after each write and you will
+be asked to fix them. File length is measured too, but splitting a file afterwards is expensive,
+so the place to get it right is here, before the file exists.'
 
 budget() {
     awk -f "$ENGINE_LIB/limits.awk" -f "$ENGINE_LIB/budget.awk" -v emit=1 </dev/null

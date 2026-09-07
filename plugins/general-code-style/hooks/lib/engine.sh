@@ -41,6 +41,7 @@ measure_records() {
         -f "$ENGINE_LIB/text.awk" \
         -f "$ENGINE_LIB/sizes.awk" \
         -f "$ENGINE_LIB/blocks.awk" \
+        -f "$ENGINE_LIB/members.awk" \
         -f "$ENGINE_LIB/comments.awk" \
         -f "$ENGINE_LIB/measure.awk" \
         -v path="$2" -v ext="$(extension_of "$2")" -- "$1"

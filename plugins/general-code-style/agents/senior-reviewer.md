@@ -45,8 +45,9 @@ These are principles, not a checklist. Weigh each against what the code is for.
 
 ## What is not a finding
 
-- **Anything `style-reviewer` owns** — file length, function length, parameter count, naming,
-  comments. That agent covers them, and repeating it buries your own findings.
+- **Anything `style-reviewer` owns** — file length, function length, parameter count,
+  member and call order, naming, comments. That agent covers them, and repeating it buries
+  your own findings.
 - **A pattern applied correctly**, even when another pattern would also have worked. That the
   code chose a factory where you would have chosen a builder is not a defect.
 - **Idiom or preference with no structural consequence** — argument order, an early return

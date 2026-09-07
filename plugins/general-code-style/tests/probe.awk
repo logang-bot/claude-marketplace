@@ -5,6 +5,8 @@
 #   -v mode=comments    line, text                            per explanatory comment
 #   -v mode=filelines   code lines, imports excluded
 #   -v mode=params -v signature=<text>   parameters counted in one signature
+#   -v mode=members     name, kind (P|C|M), visibility rank, line   per direct member
+#   -v mode=order       name, line, reason                          per ordering finding
 
 BEGIN {
     init_limits()
@@ -23,6 +25,15 @@ END {
     if (mode == "functions") {
         for (k = 1; k <= FN_N; k++)
             print FN_NAME[k], FN_LINE[k], FN_BODY[k], FN_PARAMS[k], FN_UI[k]
+        exit 0
+    }
+    if (mode == "members" || mode == "order") {
+        iter_members(path, ext)
+        if (mode == "order") {
+            for (k = 1; k <= OD_N; k++) print OD_NAME[k], OD_LINE[k], OD_REASON[k]
+            exit 0
+        }
+        for (k = 1; k <= MB_N; k++) print MB_NAME[k], MB_KIND[k], MB_VIS[k], MB_LINE[k]
         exit 0
     }
     if (mode == "sized") {

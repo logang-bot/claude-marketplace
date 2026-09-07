@@ -45,6 +45,10 @@ check "the function rule is included" \
     "$(printf '%s' "$OUT" | grep -c 'Limit the number of parameters' | tr -d ' ')" "1"
 check "the comment rule is included" \
     "$(printf '%s' "$OUT" | grep -c 'Never explain code with inline comments' | tr -d ' ')" "1"
+check "the member-order rule is included" \
+    "$(printf '%s' "$OUT" | grep -c 'Declare members in a fixed order' | tr -d ' ')" "1"
+check "the call-order rule is included" \
+    "$(printf '%s' "$OUT" | grep -c 'Place a method below the one that calls it' | tr -d ' ')" "1"
 check "shell-written code is named as in scope" \
     "$(printf '%s' "$OUT" | grep -c 'generator script' | tr -d ' ')" "1"
 

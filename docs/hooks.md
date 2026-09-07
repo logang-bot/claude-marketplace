@@ -653,7 +653,8 @@ awk:
 
 ```sh
 awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" \
-    -f "$LIB/blocks.awk" -f "$LIB/comments.awk" -f "$LIB/measure.awk" \
+    -f "$LIB/blocks.awk" -f "$LIB/members.awk" -f "$LIB/comments.awk" \
+    -f "$LIB/measure.awk" \
     -v path="$2" -v ext="$(extension_of "$2")" -- "$1"
 ```
 
@@ -663,6 +664,7 @@ awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" \
 | `text.awk` | String-literal blanking, comment markers, the allowed-comment list |
 | `sizes.awk` | File length, body length, parameter counting |
 | `blocks.awk` | Declaration matching and the span of the body each one opens |
+| `members.awk` | Member order inside a type body — the blocks and the visibility tiers |
 | `comments.awk` | Explanatory comments found inside a body |
 | `findings.awk` | Advisory wording |
 | `measure.awk` | Emits one tab-separated record per finding |
@@ -685,6 +687,7 @@ numbers in different shapes:
 ```
 FILE <path> <code lines>            LONG <path> <name> <line> <body>
 WIDE <path> <name> <line> <params>  NOTE <path> <line> <text>
+ORDER <path> <name> <line> <reason>
 ```
 
 | Constant | Value | Meaning |
@@ -696,6 +699,8 @@ WIDE <path> <name> <line> <params>  NOTE <path> <line> <text>
 | `MAX_WARNINGS` | 5 | Advisories shown before the rest collapse into a count |
 | `GROWTH_LIMIT` | 50 | Lines added to an already-oversized file before its shape becomes this request's |
 | `SOURCE` | allow-list | The one scope: what the hook measures and the sweep opens |
+| `ORDERED` | allow-list | Where member order is measured — the languages with a visibility keyword |
+| `IMPLICIT_METHOD` | allow-list | Where a class method carries no declaration keyword, so the member walk finds it itself |
 
 File length is measured for the extensions in `SOURCE`, and nothing else. That set is the
 **single scope shared with the sweep** — `scope.awk` reads it too, so the two can never disagree

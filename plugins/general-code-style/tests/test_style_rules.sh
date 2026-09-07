@@ -23,13 +23,13 @@ check() {
 }
 
 probe() {
-    awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" -f "$LIB/blocks.awk" \
+    awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" -f "$LIB/blocks.awk" -f "$LIB/members.awk" \
         -f "$LIB/comments.awk" -f "$HERE/probe.awk" \
         -v mode="$1" -v ext="$2" -v signature="${4:-}" -- "$3"
 }
 
 advise() {
-    awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" -f "$LIB/blocks.awk" \
+    awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" -f "$LIB/blocks.awk" -f "$LIB/members.awk" \
         -f "$LIB/comments.awk" -f "$LIB/measure.awk" -v path="$2" -v ext="$1" -- "$3" \
     | awk -f "$LIB/limits.awk" -f "$LIB/findings.awk" -f "$LIB/advise.awk" \
         -v scope="in this file"
@@ -193,10 +193,10 @@ check "a lambda arrow is not a generic" \
 
 # --- one scope, shared by the hook and the sweep -----------------------------
 
-for ext in kt py lua rb tf md json yaml png jar txt lock; do
+for ext in kt ts java cs py lua rb tf md json yaml png jar txt lock; do
     : > "$WORK/scoped.$ext"
     measured=$(awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" \
-        -f "$LIB/blocks.awk" -f "$LIB/comments.awk" -f "$LIB/measure.awk" \
+        -f "$LIB/blocks.awk" -f "$LIB/members.awk" -f "$LIB/comments.awk" -f "$LIB/measure.awk" \
         -v path="x.$ext" -v ext="$ext" -- "$WORK/scoped.$ext" | grep -c . | tr -d ' ')
     swept=$(printf 'x.%s\n' "$ext" | awk -f "$LIB/limits.awk" -f "$LIB/scope.awk" \
         | grep -c . | tr -d ' ')

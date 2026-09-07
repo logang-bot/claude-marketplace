@@ -5,7 +5,7 @@ argument-hint: "[path]"
 ---
 
 Review the design of `$ARGUMENTS`. This covers structure, not style — `/style-check` owns size,
-naming, and comments, and this command does not repeat them.
+member order, naming, and comments, and this command does not repeat them.
 
 ## Picking a target
 
