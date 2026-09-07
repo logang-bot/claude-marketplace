@@ -1,10 +1,15 @@
 #!/bin/sh
-# UserPromptSubmit hook: record the state of the tree before the turn does anything to it.
+# UserPromptSubmit hook: record the state of the tree before the request does anything to it.
 #
-# This is the baseline check-new-files.sh measures against at Stop. Taking it here rather than
-# at the end of the previous turn is what lets the very first turn of a session be checked at
-# all — a snapshot written at Stop would leave turn one with nothing to compare to, and turn
-# one is often the one that creates the files.
+# This is the baseline check-size.sh and check-new-files.sh measure against. Taking it here
+# rather than at the end of the previous turn is what lets the very first turn of a session be
+# checked at all — a snapshot written at Stop would leave turn one with nothing to compare to,
+# and turn one is often the one that creates the files.
+#
+# It is not retaken on every prompt. The client submits prompts the user never typed — a
+# background subagent finishing wakes the session with a task notification carrying a fresh
+# prompt id — and re-snapshotting there would fold that subagent's writes into the baseline,
+# so they would never be measured by anything. A wake keeps the baseline the request began with.
 #
 # It records only what git already reports as differing from HEAD, so a clean tree snapshots
 # nothing and the file stays small.
@@ -16,6 +21,7 @@
 set -u
 . "$(dirname "$0")/lib/engine.sh"
 . "$(dirname "$0")/lib/turn.sh"
+. "$(dirname "$0")/lib/state.sh"
 require_tools awk git
 
 read_payload
@@ -34,6 +40,19 @@ root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || exit 0
 
 turn_prepare || exit 0
 
-snapshot=$(turn_snapshot_file "$(payload_value session_id)")
+session=$(payload_value session_id)
+snapshot=$(turn_snapshot_file "$session")
+
+# A wake in the middle of a request keeps the baseline that request started with. With no
+# snapshot at all there is nothing to keep, so one is taken whatever submitted the prompt.
+if [ -f "$snapshot" ] && ! turn_is_human_prompt "$(payload_value prompt)"; then
+    exit 0
+fi
+
+# The set of findings already raised belongs to the request that is ending, not the one
+# starting, so it goes with it.
+previous=$(turn_request_id "$snapshot" 2>/dev/null) || previous=""
+[ -n "$previous" ] && rm -f "$(reported_file "$session" "$previous")" 2>/dev/null
+
 turn_candidates "$cwd" "$root" | turn_save "$snapshot" "$(payload_value prompt_id)"
 exit 0

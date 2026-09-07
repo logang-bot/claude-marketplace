@@ -15,15 +15,16 @@ restating it.
 | Agent | `style-reviewer` | Asked to check style, or after a batch of new code |
 | Agent | `senior-reviewer` | Asked for a design or architecture review, or before a refactor |
 | Agent | `leak-hunter` | Asked about leaks, or after code that acquires a resource |
-| Command | `/style-check [path] [--sweep]` | Run explicitly |
+| Command | `/style-check [path] [--sweep] [--dirty]` | Run explicitly |
 | Command | `/design-review [path]` | Run explicitly |
 | Command | `/leak-check [path] [--report-only]` | Run explicitly |
 | Hook | `SubagentStart` | A subagent starts — hands it the rules its context does not carry |
 | Hook | `UserPromptSubmit` in plan mode | A planning turn begins — hands the main thread the caps |
 | Hook | `PreToolUse` on `ExitPlanMode\|Skill` | A plan is accepted, or a brainstorming skill runs |
-| Hook | `UserPromptSubmit` | Snapshots the tree, so the `Stop` hook can scope itself to the turn |
+| Hook | `PreToolUse` on a write tool | The first write of a session — the last moment before code exists |
+| Hook | `UserPromptSubmit` | Snapshots the tree and its findings, so the checks can scope themselves to the request |
 | Hook | `PostToolBatch` | After a batch of writes, over the files that named a path |
-| Hook | `Stop` | At end of turn, over the files git reports the turn worked on |
+| Hook | `Stop` | At each yield, over the files git reports the request worked on |
 | Script | `scripts/sweep.sh` | Via `/style-check` on a large target, or run directly |
 | Modules | `hooks/lib/*.awk` | Loaded by the hooks, the sweep, and the tests |
 | Tests | `tests/test_*.sh` | In CI, and before pushing a measurement change |
@@ -99,28 +100,46 @@ description matching is probabilistic. Injection is not.
 
 - `hooks/inject-rules.sh` (`SubagentStart`) hands the rules to every subagent, which starts
   with a fresh context and matches no descriptions at all.
-- `hooks/inject-plan-rules.sh` covers **the main thread**, which does most of the writing and
-  had no deterministic injection before. It sends the caps as design constraints when a
-  planning turn begins (`UserPromptSubmit` with `permission_mode` of `plan`) or a brainstorming
-  skill runs, and the full rules at the handoff into implementation (`PreToolUse` on
-  `ExitPlanMode`).
+- `hooks/inject-plan-rules.sh` covers **the main thread**, which does most of the writing and had
+  no deterministic injection before. It sends the caps as design constraints when a planning turn
+  begins (`UserPromptSubmit` with `permission_mode` of `plan`) or a brainstorming skill runs, the
+  full rules at the handoff into implementation (`PreToolUse` on `ExitPlanMode`), and the full
+  rules again before the **first write of any session** — which is what covers an ordinary turn
+  that never plans anything, and that is most of them.
 
 The point is where the correction is cheapest. Measuring after the fact is correct, but it is
-paid for in rework: a 300-line file gets written, measured, and then split. During planning
-there is nothing to refactor yet, so the same correction costs a paragraph. The digest is sent
-**once per planning episode** rather than once per turn, and the episode ends at the
-`ExitPlanMode` that closes it.
+paid for in rework: a 300-line file gets written, measured, and then split. Before the file
+exists there is nothing to refactor, so the same correction costs a paragraph.
 
-This does not replace the measuring hooks and is not allowed to. Injection makes a violation
-less likely; only the hooks below make it visible. See [../hooks.md](../hooks.md) for the
-triggers, the episode marker, and the client-support risk.
+Injection carries more weight than it used to. A file over the line cap is **reported** rather
+than ordered, so prevention is the only thing actually keeping files small — see the size hooks
+below. The digest is sent once per planning episode; the full rules once per session, whichever
+trigger gets there first. See [../hooks.md](../hooks.md) for the triggers, the two markers, and
+the client-support risk.
 
-## The size hook
+## The size hooks
 
-`hooks/check-size.sh` runs after every write that names a file and measures the file that was just
-written. It exits `2` with an advisory on stderr when a rule is broken — the write has already
-succeeded, so the message is advice, not a rejection. It checks four things: file length,
-function body length, parameter count, and comments that explain code inside a function body.
+`hooks/check-size.sh` runs after every batch of writes that name a file; `hooks/check-new-files.sh`
+runs at the end of a turn and asks git instead, so it catches writes no tool payload described —
+a heredoc, a `sed -i`, a generator script, an MCP server. Both answer on stdout with
+`additionalContext`, which reaches the model as feedback; neither blocks anything, and neither is
+rendered as an error.
+
+They check four things: file length, function body length, parameter count, and comments that
+explain code inside a function body. **Two rules govern how each one is delivered.**
+
+**Only what the turn introduced is reported.** A violation that was already in the file before the
+work started is not the turn's to answer for. Editing one line of a file that has been 300 lines
+for months says nothing at all — that scope explosion is what used to send an agent off to
+refactor code nobody asked it to touch.
+
+**The cost of the fix decides whether it is an order or a report.** Function length, parameter
+count and comments are local: they are complete the moment the function is written, and fixing one
+is an extraction inside a file still in hand. Those are ordered, at the write. File length is
+neither knowable mid-turn nor cheap to fix, so it is **reported to the user** — the size is stated
+and the decision to split is theirs. Anything left over the cap is re-surfaced until it is fixed
+or the turn hands back, and `scripts/sweep.sh --dirty` lists what is still uncommitted and over
+the cap at any time.
 
 The script is a thin entry point; the measurements live in `hooks/lib/`, a set of awk modules the
 sweep and the tests import too, so no two of them can disagree about a cap.
@@ -321,23 +340,31 @@ which are worth acting on in isolation. The intended order is:
 ## The sweep script
 
 `scripts/sweep.sh` measures a whole tree. It loads the same `hooks/lib/` modules the hooks do
-rather than restating any of
-them, so a sweep and a post-write advisory can never disagree about a cap. It puts the plugin's
-`hooks/` directory on `sys.path` and imports the package by name.
+rather than restating any of them, so a sweep and a post-write advisory can never disagree about
+a cap.
 
 ```
-sh scripts/sweep.sh <path> [--top N] [--strict]
+sh scripts/sweep.sh <path> [--top N] [--strict] [--dirty]
 ```
 
 `--top` caps the file listing (default 20) so a legacy repo does not dump thousands of lines.
 `--strict` exits `1` when anything is found, which makes the same script usable as a CI gate;
 the default exit is `0` because a report is not a failure.
 
+`--dirty` narrows the sweep to files that differ from `HEAD`, tracked or untracked — the same
+pair `lib/turn.sh` reads the tree through. It exists because the hooks **report** a file over the
+line cap rather than ordering a split, so an unfixed one stays in the working tree, and that
+makes "uncommitted and over the cap" a precise definition of outstanding style debt. It is the
+check to run before a commit, and `--strict --dirty` is the same thing as a pre-commit gate. It
+needs a git repository and says so if there is none.
+
 File discovery uses `SOURCE` — the same set the hook measures, read through `scope.awk` — with `git ls-files` when
 the target is in a repo, so `.gitignore` is respected for free, and a filesystem walk otherwise. Either way `SKIP_DIRS` drops
 `node_modules`, `build`, `vendor`, and friends — vendored and generated code is often tracked,
 so being in git is not enough to make something worth measuring.
 
-The hook and the sweep now report the same findings; the hook caps its list at five per file
-because it interrupts a write, while the sweep lists every one and is ordered by severity. That
-shared measurement is what makes the totals trustworthy.
+The hooks and the sweep measure the same things, but answer different questions. A hook reports
+only what the current request introduced, and caps its list at five because it interrupts work;
+the sweep reports everything it finds, ordered by severity, because it was asked to. That shared
+measurement is what makes the totals trustworthy — and it is why the sweep, not the hooks, is
+where you go to ask what the whole tree looks like.

@@ -1,5 +1,5 @@
 {
-  "description": "Gives the main thread and every subagent the style rules before code is written — while a plan is being made, and at the handoff into implementation — and requires the files a turn creates, modifies or renames to meet the general-code-style size caps",
+  "description": "Gives the main thread and every subagent the style rules before code is written — while a plan is being made, at the handoff into implementation, and before the first write of any session — then reports what a request introduces: function, parameter and comment findings as fixes to make at the write, file size as something for the user to decide",
   "hooks": {
     "SubagentStart": [
       {
@@ -15,7 +15,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "ExitPlanMode|Skill",
+        "matcher": "ExitPlanMode|Skill|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
@@ -51,7 +51,7 @@
             "type": "command",
             "shell": "bash",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/check-size.sh\"",
-            "timeout": 10
+            "timeout": 15
           }
         ]
       }

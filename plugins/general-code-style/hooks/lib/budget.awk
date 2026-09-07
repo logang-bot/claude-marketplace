@@ -17,7 +17,7 @@
 # neither prints nor short-circuits their END blocks.
 #
 # The targets behind the caps (~200 lines, ~7-line bodies) are deliberately absent. This
-# text states what is enforced and will block a turn; the full rules carry the aim.
+# text states what is measured and what happens when it is missed; the full rules carry the aim.
 
 BEGIN {
     if (emit == "") exit          # loaded for a parse check, not to produce anything
@@ -25,8 +25,9 @@ BEGIN {
     init_limits()
 
     printf "general-code-style — design budgets for this plan.\n\n"
-    printf "The code this plan produces will be measured against these caps, by a hook that\n"
-    printf "blocks the turn from ending until they are met:\n\n"
+    printf "The code this plan produces is measured against these caps as it is written.\n"
+    printf "A function or signature over the cap comes back as a fix to make on the spot; a\n"
+    printf "file over the line cap is reported to the user, who decides whether it is split:\n\n"
     printf "  source file    %4d lines   (imports and package lines are not counted)\n", FILE_LIMIT
     printf "  function body  %4d lines   (blank lines and comments are not counted)\n", FUNCTION_LIMIT
     printf "  parameters     %4d         (group the extras into a type beyond that)\n\n", PARAM_LIMIT

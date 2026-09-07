@@ -107,8 +107,33 @@ check "an unrelated skill is silent" \
     "$(bytes "$(run "$(tool_payload bs-c Skill 'dev-workflow:changelog')")")" "0"
 check "a Skill call with no skill named is silent" \
     "$(bytes "$(run '{"hook_event_name":"PreToolUse","session_id":"bs-d","tool_name":"Skill","tool_input":{}}')")" "0"
-check "an unrelated tool is silent" \
-    "$(bytes "$(run "$(tool_payload bs-e Write '')")")" "0"
+check "a tool that neither plans nor writes is silent" \
+    "$(bytes "$(run "$(tool_payload bs-e Read '')")")" "0"
+
+# --- the write trigger --------------------------------------------------------
+
+# Most turns never enter plan mode, so nothing used to reach the main thread before it wrote
+# code. This is the last moment that is still *before* the file exists, and it matters more now
+# that a file over the line cap is reported rather than ordered: prevention is the only thing
+# left keeping files small.
+check "the first write of a session is served the full rules" \
+    "$(grep_count 'Limit the number of parameters' "$(run "$(tool_payload w-a Write '')")")" "1"
+check "and it says the rules govern what follows too" \
+    "$(grep_count 'every file and function you write after it' "$(run "$(tool_payload w-b Write '')")")" "1"
+check "the second write is silent" \
+    "$(bytes "$(run "$(tool_payload w-a Write '')")")" "0"
+check "so is an Edit after it" \
+    "$(bytes "$(run "$(tool_payload w-a Edit '')")")" "0"
+check "every write tool triggers it" \
+    "$(grep_count 'Limit the number of parameters' "$(run "$(tool_payload w-c MultiEdit '')")")" "1"
+check "including a notebook edit" \
+    "$(grep_count 'Limit the number of parameters' "$(run "$(tool_payload w-d NotebookEdit '')")")" "1"
+
+# A planned session is handed the rules at the handoff, so the first write afterwards must not
+# charge the payload a second time.
+run "$(tool_payload w-e ExitPlanMode '')" >/dev/null
+check "a handoff claims the session, so the next write adds nothing" \
+    "$(bytes "$(run "$(tool_payload w-e Write '')")")" "0"
 
 # --- bad input is silent, never noisy -----------------------------------------
 

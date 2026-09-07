@@ -1,7 +1,7 @@
 ---
 name: style-check
 description: Reviews code against the file-size, function-size, parameter-count, naming, and comment rules, in agent mode for a diff or small path and mechanical sweep mode for a large tree. Use when asked to check style compliance or audit a codebase against these conventions.
-argument-hint: "[path] [--sweep]"
+argument-hint: "[path] [--sweep] [--dirty]"
 ---
 
 Check `$ARGUMENTS` against the style rules. Pick the mode from the size of what you are
@@ -17,6 +17,7 @@ directory listing.
 - **More than 30 files** → sweep. An agent cannot read a codebase that size without
   exhausting its context, and reading is what costs.
 - **`--sweep` present** → sweep, whatever the size.
+- **`--dirty` present** → sweep, narrowed to what is not committed yet.
 
 Say which mode you picked and why in one line before you run it.
 
@@ -37,6 +38,8 @@ Locate `scripts/sweep.sh` inside this plugin by globbing for
 sh <path-to>/sweep.sh <target> --top 20
 ```
 
+Pass `--dirty` straight through when the user asked for it.
+
 Print the report as it comes back. Do not re-rank it, re-summarise it, or re-measure anything
 yourself — it is already ordered by severity and capped, and it reads its limits from the same
 file the size hook uses.
@@ -48,6 +51,23 @@ says. Both need a reading of the code rather than a measurement of it.
 
 Finally, offer the next step and stop: ask whether to review one of the listed files with the
 `style-reviewer` agent, which does cover those remaining judgement calls.
+
+## The uncommitted sweep
+
+`--dirty` limits the sweep to files that differ from `HEAD`, tracked or not. It exists because
+the size hooks **report** a file over the line cap rather than ordering a split — so an unfixed
+one sits in the working tree, and the working tree is where it can still be dealt with cheaply.
+
+That makes it the check to run before a commit, and the one to reach for when the user asks what
+style debt this session left behind:
+
+```
+sh <path-to>/sweep.sh . --dirty
+```
+
+`--strict` alongside it exits 1 while anything is over the caps, so the same command works
+unchanged as a pre-commit hook or a CI step. It needs a git repository and says so if there
+is none.
 
 ## In both modes
 

@@ -65,6 +65,22 @@ the load-bearing one: a comment check that flags `TODO`, a licence header, a `//
 or a Python docstring would make the hook unusable noise, and a parameter counter that miscounts
 a trailing comma or a `Map<String, Int>` invents findings that are not there.
 
+The style hooks are covered by four more suites, split by what they are asking about rather than
+by which script they drive:
+
+| Suite | Asks |
+|---|---|
+| `test_turn_scope.sh` | Whose work is this? Create, idle, rename, idle, modify, fix — plus the inherited case, the growth allowance, a background wake, and the loop guard |
+| `test_new_file_scan.sh` | With the request primed so everything is its work: filtering, capping, routing, and the guards |
+| `test_batch_scan.sh` | A batch measured once, a read kept out of it, and the same file written three times reported once |
+| `test_sweep_scope.sh` | What `--dirty` looks at, and that `--strict` fails while something is over the cap |
+
+Two things about these are easy to get wrong when adding a case. Each hook **records what it has
+already said**, so a scenario must be run once and asserted against afterwards — calling the hook
+twice to make two assertions is itself one of the behaviours under test. And they read the hook's
+answer back through the plugin's own `lib/json.awk`, which doubles as a check that what the hook
+emits is JSON a client could actually parse.
+
 ## What `validate.yml` checks
 
 Runs on every push and pull request, in two jobs: `manifests` on `ubuntu-latest` and `windows` on

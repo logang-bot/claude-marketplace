@@ -5,9 +5,16 @@ are markdown instructions that shape what Claude does; a hook is a program the h
 fixed point in the loop, whether or not anyone asked.
 
 All seven here are POSIX shell for the glue and `awk` for anything that has to read code. They
-read the hook payload as JSON on stdin and communicate back through their exit code — except
-`inject-rules.sh` and `inject-plan-rules.sh`, which answer on stdout in JSON, because injecting
-context is not something an exit code can express.
+read the hook payload as JSON on stdin. The two guards in `dev-workflow` answer through their
+exit code; the five in `general-code-style` answer on **stdout in JSON**, because what they have
+to say is context rather than a verdict — and, in the case of the two style checks, because a
+finding delivered through `exit 2` is rendered to the user as a hook *error*, which is what
+stalled agents mid-task before 0.11.0.
+
+**Minimum client: 2.1.163.** That is where `hookSpecificOutput.additionalContext` became
+available on `Stop`, described in the client's own schema as *"non-error feedback delivered to
+the model; the conversation continues so the model can act on it"*. On anything older the field
+is ignored in silence and the style findings are simply lost.
 
 ## Why shell and awk
 
@@ -37,9 +44,22 @@ Write **POSIX awk only**: macOS ships BWK awk, so `gensub()`, `IGNORECASE`, `@in
 
 | Exit | Meaning |
 |---|---|
-| `0` | Silent. Allow whatever was about to happen. |
-| `2` | Surface the stderr text. On `PreToolUse` this **blocks** the tool call; on `PostToolUse`, `PostToolBatch` and `Stop` the call already happened, so the text is advice. |
+| `0` | Allow whatever was about to happen. Silent, unless the hook printed `hookSpecificOutput` JSON on stdout. |
+| `2` | Surface the stderr text. On `PreToolUse` this **blocks** the tool call; on `PostToolUse`, `PostToolBatch` and `Stop` the call already happened, so the text is advice — but the client labels it a hook error either way. |
 | anything else | **Non-blocking error.** The message may surface, but nothing is prevented. |
+
+### Why the style hooks do not use `exit 2`
+
+They used to. `exit 2` on `Stop` blocks the turn from ending, which looked like the way to give a
+finding weight. What it actually produced was `Stop hook error: [sh …]` in red, an agent ordered
+mid-task to split a file it had touched one line of, and — since a correct agent refuses work
+nobody asked for — turns that appeared to stall.
+
+Returning `{"hookSpecificOutput": {"hookEventName": "Stop", "additionalContext": "…"}}` on exit
+`0` delivers the same text to the model, keeps the conversation going so it can act, and is not
+an error. The cost is that the anti-loop guarantee `exit 2` came with — `stop_hook_active`, which
+the client sets only when a hook *blocks* — no longer applies, so each style hook carries its own
+guard. Those are described in their sections below.
 
 ### Hooks fail open
 
@@ -191,19 +211,75 @@ editing a `SKILL.md` does not, because `.md` already counts as documentation.
 
 ---
 
+## The two style checks, and what decides which is which
+
+`check-size.sh` and `check-new-files.sh` measure the same things and share every awk module. What
+separates them is not what they look at but **when they get to look**, and one rule governs both:
+
+> The cost of the fix decides whether a finding is an order or a report. The moment is always the
+> earliest thing that can see it.
+
+| Finding | Knowable | Cost to fix | Treatment |
+|---|---|---|---|
+| Function body over the cap | when the function is written | a local extraction | **Order**, at the earliest sighting |
+| Signature over the parameter cap | when the signature is written | local, and fewest callers exist yet | **Order**, at the earliest sighting |
+| Explanatory comment in a body | when it is written | rename, or extract a named helper | **Order**, at the earliest sighting |
+| File over the line cap | only when the request is done | move members, chase call sites | **Report to the user**, never ordered |
+
+File size is the one that derails, and it derails on both axes. A file is not finished
+mid-request, so a split ordered after write two of five is a guess; and splitting is a piece of
+work rather than a lint. Ordering it is what turned "add a login screen" into an unrequested
+refactor. So the size is stated and handed to the user, who decides.
+
+The rule is **not** "Stop never orders". Stop is the only sighting for a write that carried no
+path — a heredoc, a `sed -i`, a generator script, an MCP server — and a cheap fix stays cheap
+whenever it surfaces, so a local finding from one of those is ordered there.
+
+### Only what the request introduced
+
+Neither hook reports a finding that was already true. `lib/keys.awk` reduces each measurement
+record to an identity that survives an edit shifting it down the file:
+
+| Record | Key |
+|---|---|
+| `FILE` over the cap | `FILE`, plus a `LINES:<n>` record for the growth test |
+| `LONG` | `LONG:<function name>` |
+| `WIDE` | `WIDE:<function name>` |
+| `NOTE` | `NOTE:<comment text>` |
+
+`lib/introduced.awk` counts those against a baseline and keeps only the records whose count rose.
+Counting rather than matching is what makes overloads and repeated comments work with no special
+case: two functions of the same name already over the body cap put the key in twice, so a third
+is reported and a rename is reported, while merely moving them is not.
+
+File size gets the one exception, because a count cannot express it. It is reported when the
+request **crossed** the cap (the baseline was at or under `FILE_LIMIT`), or when a file already
+over it grew by more than `GROWTH_LIMIT`. A request that adds one line to a 289-line file did not
+create that file's shape; one that adds three hundred owns the result.
+
+The baseline comes from two places, and the second is why the snapshot stays small:
+
+- **Files already dirty when the request began** are measured by `snapshot-turn.sh` and their keys
+  stored in the snapshot, up to `TURN_MAX_BASELINE`.
+- **Everything else** was clean at HEAD, so its pre-request content *is* `git show HEAD:<path>`,
+  resolved lazily at report time for the few files actually touched. A path absent from HEAD is
+  new, and the empty baseline correctly makes every finding in it the request's own.
+
+---
+
 ## `check-size.sh`
 
-**Event:** `PostToolBatch` · **No matcher** · **Timeout:** 10s · Plugin: `general-code-style`
+**Event:** `PostToolBatch` · **No matcher** · **Timeout:** 15s · Plugin: `general-code-style`
 
-**Payload keys read:** `tool_calls[].tool_name`, and the first of `tool_input.file_path`,
-`notebook_path`, `path`, `filePath` at the same index that names a file that exists. Tools
-disagree about what to call the target, and an MCP server that writes files picks its own name,
-so the common spellings are all tried.
+**Payload keys read:** `session_id`, `prompt_id`, `cwd`, `tool_calls[].tool_name`, and the first
+of `tool_input.file_path`, `notebook_path`, `path`, `filePath` at the same index that names a file
+that exists. Tools disagree about what to call the target, and an MCP server that writes files
+picks its own name, so the common spellings are all tried.
 
-Measures everything the batch wrote and exits `2` with one message when a rule is broken. The
-writes have already succeeded, so nothing is being rejected — but the wording states a required
-fix rather than an advisory, and refuses the "it was already like that" excuse, for the reasons
-set out under `check-new-files.sh` below. It carries the same "only these files" scope limit.
+Orders the local findings and reports file size. Reporting size **here** rather than only at Stop
+is the part worth understanding: `Stop` runs *after* the model has composed its hand-back summary,
+so anything first delivered there can only be a follow-up message. Told at the write, the model
+has the fact in context while it is still working and can put it in the summary itself.
 
 ### Why the batch, not the call
 
@@ -211,8 +287,7 @@ set out under `check-new-files.sh` below. It carries the same "only these files"
 block produced five separate hook processes, each printing its own advisory and each applying
 `MAX_WARNINGS` on its own — the cap held five times over instead of once. `PostToolBatch` fires
 once after every call in the batch has resolved, so the whole batch is measured together and the
-cap means what it says. It is also where `advise.awk`'s `scope` earns its keep: the file is named
-only when exactly one was measured, the same rule `check-new-files.sh` follows.
+cap means what it says.
 
 ### The matcher is omitted deliberately
 
@@ -220,22 +295,28 @@ A `PostToolBatch` matcher must match **every** call in the batch, not any of the
 `Write|Edit|MultiEdit|NotebookEdit`, a batch holding one `Read` beside a `Write` would skip the
 hook entirely. So no matcher is set and the write-tool filter lives in `lib/batch.awk`, which
 pairs each `tool_name` with the path at the same array index and keeps only the calls that
-actually wrote. Without that filter the hook would measure a file that was merely **read**, which
-is how an advisory becomes a nag.
+actually wrote. Without that filter the hook would measure a file that was merely **read**.
+
+### Saying it once
+
+Every finding it reports goes into a **reported set** under `TURN_DIR`, keyed by session and
+request. Re-editing the same file mid-request is therefore silent — the repro that started this
+rewrite was one over-cap file written three times producing three identical orders. The same set
+is what lets `check-new-files.sh` tell "already raised" from "never seen".
+
+### Without git
+
+A directory that is not a repository has no baseline, so inherited findings cannot be told from
+new ones. The local findings are still reported, being cheap to fix and probably the agent's own;
+file size is dropped, being the expensive one to be wrong about. Erring by cost, again.
 
 ### The risk worth naming
 
 `PostToolBatch` is in the client's hook schema but has **no changelog entry anywhere in 2.x**. If
-it turns out to be inert on some client, this check silently stops running — the exact failure
-this whole migration exists to end. Two things blunt it: `check-new-files.sh` still catches every
-**new** file at `Stop` regardless of event support, and the script still handles the single-call
-payload shape, so re-registering it on `PostToolUse` restores the old behaviour with no code
-change. The gap that would open in the meantime is narrow but real: **a modification to a file
-that already exists**, which the `Stop` hook does not measure by design.
-
-This hook only ever sees a write that **carries a path in its payload**. A heredoc, a `sed -i`,
-or a generator script carries none, and no matcher can fix that — that gap is what
-`check-new-files.sh` below exists to close.
+it turns out to be inert on some client, this check silently stops running. Two things blunt it:
+`check-new-files.sh` still catches everything at `Stop` regardless of event support, and the
+script still handles the single-call payload shape, so re-registering it on `PostToolUse` restores
+the behaviour with no code change.
 
 ---
 
@@ -245,112 +326,87 @@ or a generator script carries none, and no matcher can fix that — that gap is 
 
 **Payload keys read:** `stop_hook_active`, `cwd`, `session_id`, `prompt_id`
 
-The catch-all behind `check-size.sh`. That hook watches tool calls, so it only sees writes that
-name a file in their payload. This one asks **git** at the end of the turn instead, which means
-it does not care what did the writing — a Bash heredoc, a `sed -i`, a generator script, a
-subagent, or an MCP server's own file-creation call all produce a file git can see.
-
-It measures **the files this turn worked on** — created, modified, or renamed alike:
+The backstop, and the place file size is handed over. It asks **git** rather than watching tool
+calls, so it does not care what did the writing:
 
 - `git ls-files --others --exclude-standard` — untracked: new files, and the destination of a
   rename done with plain `mv`
 - `git diff --name-only HEAD` — tracked: modifications and staged renames
 
-then narrows that to what actually changed during the turn, by comparing against the snapshot
-`snapshot-turn.sh` took when the prompt arrived. Both hooks read the tree through
-`turn_candidates` in `lib/turn.sh`, so the snapshot and the comparison can never disagree about
-what counted as a candidate.
+then narrows that to what changed during the request, against the snapshot. Both hooks read the
+tree through `turn_candidates` in `lib/turn.sh`, so the snapshot and the comparison can never
+disagree about what counted as a candidate.
 
 ### Why `--diff-filter=A` is gone
 
-The query used to carry `--diff-filter=A`, excluding every modification, and this document used
-to call removing it "the single edit that would turn this hook into a nag". That was true when
-untracked-forever was the only guard, and it was still the wrong trade:
+The query used to carry it, excluding every modification, and this document used to call removing
+it "the single edit that would turn this hook into a nag". That was true when untracked-forever
+was the only guard, and it was still the wrong trade:
 
-- **It reported too much.** Untracked never expires. A file stays untracked until someone
-  commits it, so an uncommitted file was reported on *every* turn, indefinitely, described as
-  "created this turn". Ordering a fix on that premise tells the agent to refactor code nobody
-  asked it to touch — and a correct agent refuses, which is exactly what happened.
+- **It reported too much.** Untracked never expires, so an uncommitted file was reported on
+  *every* turn, indefinitely, described as "created this turn".
 - **It reported too little.** A shell command that appended to an existing file, or renamed one,
   was never caught at all.
 
-The snapshot replaces the filter and is a stronger guard in both directions: a violation already
-sitting in the working tree is not this turn's work and stays silent, while a file the turn
-modified is measured even though git has known about it for months.
+The snapshot replaces the filter and is stronger in both directions.
 
-### The turn boundary
+### The outstanding list
 
-`prompt_id` is a base field on every payload, which the client describes as *"UUID correlating a
-user prompt with all subsequent events until the next prompt"* — an exact turn boundary, no
-timestamps involved.
+A file-size finding reported once would become "pre-existing" on the next request and never be
+raised again — which is how the debt gets lost. So every file this session pushes over the cap
+goes on a session-scoped list, re-measured at each `Stop` so that one split later in the request
+drops off instead of being carried to the hand-back as a finding that is no longer true.
 
-A candidate counts as **worked on** when its path is absent from the snapshot, or present with a
-different size. Size, not mtime, is the change signal, and that is load-bearing: `mv` preserves
-mtime, so a timestamp check would miss a pure rename — the precise case that prompted this
-rewrite. A rename is caught because the path is new to the snapshot, not because anything about
-its contents changed.
+Who still hears about it is bounded on purpose:
 
-State lives at `${TMPDIR:-/tmp}/general-code-style/<session_id>.snapshot`, holding the
-`prompt_id` it was written under followed by one `path<TAB>size` line per candidate. The session
-id is scrubbed to filename-safe characters before it reaches a path, because it arrives from a
-payload.
+- the request that introduced it, at **every** yield until it hands back
+- any later request that touches the file again
 
-**This is the repo's only on-disk state**, and it earns the exception: no other mechanism can
-distinguish the agent's work from what it inherited, and without that distinction the hook
-cannot honestly order anything.
+and nobody else. Repeating it in every request afterwards would be the nagging this rewrite exists
+to end. `sweep.sh --dirty` is what answers "what is still outstanding" across a whole session.
+
+### Not repeating itself forever
+
+`Stop` fires at every yield, not only the last one, and the answer no longer blocks — so emitting
+the same text at each yield would never terminate. The guard is a fingerprint: the message, plus
+the list of files the request has worked on, is compared against the last one sent, and nothing is
+sent when they match. That terminates, and still speaks up whenever there is something new to say.
+
+`stop_hook_active` is still honoured. Ours no longer blocks, so the flag should never be set on
+its account, but standing down inside another hook's continuation is the polite answer.
 
 ### Failure modes
 
 | Situation | Behaviour |
 |---|---|
 | `TMPDIR` not writable | Exit `1` with a message. The hook cannot tell whose work it is looking at, and reporting anyway would issue false orders. `0` would repeat the silent-guard bug. |
-| No snapshot (the prompt hook did not run) | Record one, report nothing. The next turn is measurable. |
-| `stop_hook_active` | Exit `0` — the hook already fired this turn and returning `2` again would loop. |
+| No snapshot (the prompt hook did not run) | Record one, report nothing. The next request is measurable. |
 | Malformed JSON, no git repository | Exit `0`. |
 
 A repository with **no commits** works: `diff HEAD` fails there and the untracked list alone is
-used.
+used. Paths are joined against `git rev-parse --show-toplevel`, deduplicated with
+`LC_ALL=C sort -u` so the ordering is by byte and not by locale, and bounded by `MAX_FILES` (40)
+— and when that bound truncates, the message now says so instead of dropping the remainder in
+silence.
 
-Paths are joined against `git rev-parse --show-toplevel`, deduplicated with `LC_ALL=C sort -u`
-so the ordering is by byte and not by locale, and bounded by `MAX_FILES` (40) so the reading fits
-inside the timeout. Findings are capped **once over the whole set** rather than per file, which
-is why `advise.awk` takes a `scope` telling it whether naming one file would be honest.
+### What the wording has to do
 
-### The wording is an order, not an observation
+The old text stated a required fix and refused the "it was already like that" excuse. Both are
+gone, because change made them false: an inherited violation is no longer reported at all, so
+there is no excuse left to refuse. What survives is the scope limit — *"Only these findings. The
+rest of each file, and every other file in the project, are out of scope."* — because an order to
+fix must never become a licence to refactor the codebase.
 
-Both style hooks used to lead with "Style advisory" and ask the agent to *consider* addressing
-the finding — and an agent that reads a finding as optional treats it as optional. They now
-state a required fix, and close two gaps that a bare order leaves open:
+The size section says the opposite of an order: *"Do not split anything unless they ask."* It
+closes by naming `/style-check` for what is not measured — naming, and whether a doc comment
+restates its member's name, both of which need the code read rather than counted. It used to name
+the `style-reviewer` agent and list files for it, which was an instruction to spawn a subagent at
+the moment the turn was trying to end.
 
-- *"That a file was already over the limit before you touched it is not a reason to skip it."*
-  This is the excuse that made the hook useless in practice: the agent renamed a file, observed
-  the violation predated the rename, and skipped it. If the turn worked on the file, the turn
-  owns it.
-- *"Only these files — do not go looking for other violations in the project."* The
-  counterweight. An order to fix must not become a licence to refactor the codebase, and the
-  scope limit is what replaces the escape hatch rather than reopening it.
-
-`exit 2` on `Stop` **blocks the turn from ending**, which is what gives the instruction weight;
-it is not merely printed. `stop_hook_active` makes the hook stand down on the second attempt so
-it cannot loop.
-
-The advisory closes by naming the `style-reviewer` agent and the files it should read. That is
-not decoration. **No hook can launch an agent** — there is no such output field on any event —
-and Claude Code's default posture suppresses spawning one unprompted, which is why the agents in
-this plugin never fired on their own. Rules 1-3 and the comment rule are already measured above;
-naming and doc comments that restate a name are not, because both need the code read rather than
-counted.
-
-Those paths come from `lib/offenders.awk`, not from the records directly. `measure.awk` prints a
-`FILE` record for **every** file it measures — `report.awk` counts them all to say how big a
-sweep was — so the size threshold has to be reapplied by anything wanting offending paths.
-Reading `$2` off every record instead is how 0.8.0 came to name four clean files beside the one
-that was actually too long.
-
-Fixtures are split by concern: `tests/test_turn_scope.sh` walks one file through create, idle,
-rename, idle, modify and fix, asserting it is reported on the turns it was worked on and silent
-on the others; `tests/test_new_file_scan.sh` covers filtering, capping and the guards with the
-turn primed so every file is unambiguously the turn's work.
+Fixtures are split by concern: `tests/test_turn_scope.sh` walks a file through create, idle,
+rename, idle, modify and fix, and covers the inherited case, the growth allowance, the wake, and
+the loop guard; `tests/test_new_file_scan.sh` covers filtering, capping, routing and the guards
+with the request primed so every file is unambiguously its work.
 
 ---
 
@@ -358,19 +414,48 @@ turn primed so every file is unambiguously the turn's work.
 
 **Event:** `UserPromptSubmit` · **Timeout:** 15s · Plugin: `general-code-style`
 
-**Payload keys read:** `cwd`, `session_id`, `prompt_id`
+**Payload keys read:** `cwd`, `session_id`, `prompt_id`, `prompt`
 
-Records what the tree looked like before the turn touched it. That snapshot is the baseline
-`check-new-files.sh` measures against.
+Records what the tree looked like, and what findings were already in it, before the request
+touched anything.
 
 It exists as a separate hook for one reason: **the baseline has to be taken before the work, not
-after it.** Writing the snapshot at `Stop` instead — using the previous turn's state as the next
-turn's baseline — is simpler and needs no second registration, but it leaves the *first* turn of
-every session with nothing to compare against, and the first turn is usually the one that
-creates the files.
+after it.** Writing it at `Stop` instead is simpler and needs no second registration, but it
+leaves the *first* request of every session with nothing to compare against, and the first request
+is usually the one that creates the files.
 
-It records only what git already reports as differing from `HEAD`, so a clean tree snapshots
-nothing.
+### A request is not a turn
+
+`prompt_id` looks like the boundary — the client calls it *"a UUID correlating a user prompt with
+all subsequent events until the next prompt"* — but a single piece of work spans several of them.
+The agent yields to wait on a background subagent, `Stop` fires, and the notification that wakes
+it **arrives as a fresh prompt with a fresh id**.
+
+Re-snapshotting there would fold whatever that subagent wrote into the baseline, and nothing would
+ever measure it. So the snapshot is retaken only for a prompt a human actually typed.
+
+There is no origin field on the payload, so the envelope the client wraps a wake in is the only
+signal: `<task-notification>`, `<system-reminder>`, `<local-command-…>` and their siblings.
+`turn_is_human_prompt` in `lib/turn.sh` holds the list, and an **unrecognised shape counts as
+human**, which retakes the snapshot — the safe direction to be wrong in, because it costs a
+measurement rather than inventing one.
+
+### Format
+
+```
+request <prompt id>
+size    <path>  <bytes>
+find    <path>  <finding key>
+```
+
+Size, not mtime, is the change signal, and that is load-bearing: `mv` preserves mtime, so a
+timestamp check would miss a pure rename. A rename is caught because the destination path is new
+to the snapshot, not because anything about its contents changed.
+
+State lives at `${TMPDIR:-/tmp}/general-code-style/`, with `TMPDIR` put through `native_path` so a
+Windows-shaped value does not leave every request reporting that the hooks cannot keep state. The
+session id is scrubbed to filename-safe characters before it reaches a path, because it arrives
+from a payload.
 
 **It never fails loudly.** `exit 2` on `UserPromptSubmit` would block the user's prompt, which is
 far worse than a missed measurement, so every path returns `0` — including a missing `awk`, an
@@ -435,8 +520,9 @@ that happen to be in a `SKILL.md` today.
 
 ## `inject-plan-rules.sh`
 
-**Events:** `UserPromptSubmit` (no matcher) and `PreToolUse` (matcher `ExitPlanMode|Skill`) ·
-**Timeout:** 15s · Plugin: `general-code-style`
+**Events:** `UserPromptSubmit` (no matcher) and `PreToolUse` (matcher
+`ExitPlanMode|Skill|Write|Edit|MultiEdit|NotebookEdit`) · **Timeout:** 15s ·
+Plugin: `general-code-style`
 
 **Payload keys read:** `hook_event_name`, `session_id`, `permission_mode`, `tool_name`,
 `tool_input.skill`
@@ -448,22 +534,49 @@ code against rules it had never been given, and `check-size.sh` and `check-new-f
 ordered the fix afterwards.
 
 That works, and it is why those two hooks stay. But it pays for correctness in **rework**: a
-300-line file is written, measured, and then split. Planning is where the same correction is
-free, because no code exists yet to refactor. This hook puts the rules there.
+300-line file is written, measured, and then split. Before the code exists, the same correction
+is free. This hook puts the rules there.
 
-### Three triggers, two payloads
+It matters more since 0.11.0 than it did before. A file over the line cap is no longer an order
+to fix, only a report for the user to act on — which leaves injection as **the only thing
+actually keeping files small**. A rule that arrives before the file exists is worth more than any
+number of findings that arrive after it.
+
+### Four triggers, three payloads
 
 | Trigger | Fires on | Injects |
 |---|---|---|
 | A planning turn | `UserPromptSubmit` with `permission_mode` of `plan` | the design budgets |
 | A brainstorming skill | `PreToolUse` on `Skill`, name containing `brainstorm` | the design budgets |
 | The handoff into implementation | `PreToolUse` on `ExitPlanMode` | the full rules |
+| The first write of a session | `PreToolUse` on `Write`/`Edit`/`MultiEdit`/`NotebookEdit` | the full rules |
 
 A plan needs the caps as **constraints to design against** — the numbers, and the instruction
 to plan a split now rather than discover one at write time. The handoff needs the rules
 themselves, and it is the moment the main thread has never had covered: the code is about to
 be written, and an approved plan is exactly the excuse that used to carry an oversized file
 past the rules.
+
+### The write trigger, and why not the first prompt
+
+Most turns never enter plan mode. Measured against a real session, a `permission_mode=default`
+prompt injected **zero** bytes while a plan-mode prompt injected 3,943 — so an ordinary request
+wrote code having never been told the rules, and first met them as a finding at the close. That
+is not a check, it is an ambush.
+
+The fix could have gone at the first prompt of every session. It goes at the first **write**
+instead, for three reasons in order of weight:
+
+- it is the last moment that is still *before* the code exists, and it works in every permission
+  mode rather than only in plan mode;
+- it costs nothing at all on a session that never writes code — research, review, a debugging
+  conversation — where injecting at the first prompt would spend the payload on all of them;
+- the marker mechanism already existed.
+
+The honest cost: arriving at the first write is slightly late to change **architecture**. If the
+model has already decided on one big file, the rules can only shape that file and the ones after
+it. Adding the budget digest at the first prompt of every session is the escalation if oversized
+files keep appearing in unplanned turns; it was not worth paying for up front.
 
 The full-rules payload is the same `skills/*/SKILL.md` assembly `inject-rules.sh` sends, under
 a different header. Both read it through `lib/rules.sh`, so there is one copy of the
@@ -477,16 +590,25 @@ shift+tab, which fires no tool call at all — a silent gap of exactly the kind 
 keeps warning about. `ExitPlanMode` is matched as a tool because it genuinely is one, and
 because every plan-mode session leaves through it.
 
-### The episode marker
+### Two markers, with different lifetimes
 
-The digest is injected **once per planning episode**, not once per planning turn. Without
-that, a long plan session would pay for it on every prompt, and the second copy teaches
-nothing. An episode runs from the first plan-mode prompt to the `ExitPlanMode` that ends it,
-where the marker is removed so a later round of planning is served again.
+The digest is injected **once per planning episode**, not once per planning turn. Without that, a
+long plan session would pay for it on every prompt, and the second copy teaches nothing. An
+episode runs from the first plan-mode prompt to the `ExitPlanMode` that ends it, where the marker
+is removed so a later round of planning is served again.
 
-State lives beside the turn snapshot, at
-`${TMPDIR:-/tmp}/general-code-style/<session_id>.planned`, through `plan_marker_file` in
-`lib/turn.sh` — the same scrubbing of a payload-supplied session id into a filename-safe key.
+The full rules use a second marker that is **never** removed, because a session should be charged
+for that payload once. `ExitPlanMode` claims it as well as injecting, which is what stops a
+planned session paying for the rules again at its first write.
+
+| Marker | File | Cleared |
+|---|---|---|
+| Planning episode served | `<session_id>.planned` | at `ExitPlanMode` |
+| Full rules delivered | `<session_id>.ruled` | never |
+
+Both live beside the turn snapshot under `${TMPDIR:-/tmp}/general-code-style/`, through
+`plan_marker_file` and `rules_marker_file` in `lib/state.sh` — the same scrubbing of a
+payload-supplied session id into a filename-safe key.
 
 **It degrades toward injecting.** Where `check-new-files.sh` exits `1` when it cannot keep
 state, this hook carries on. The asymmetry is deliberate: reporting without a baseline means
@@ -495,10 +617,11 @@ a correctness failure and the other is a rounding error, so they get opposite de
 
 ### `exit 2` is unavailable on both events
 
-On `UserPromptSubmit` it blocks the user's own prompt. On `PreToolUse` it blocks the tool call
-— and blocking `ExitPlanMode` would make plan mode unusable. There is no injection failure
-worth either, so **every path returns `0`**, including a missing skill directory, a malformed
-payload, and an unwritable `TMPDIR`.
+On `UserPromptSubmit` it blocks the user's own prompt. On `PreToolUse` it blocks the tool call —
+and blocking `ExitPlanMode` would make plan mode unusable, while blocking `Write` would make the
+plugin unable to write anything at all. There is no injection failure worth any of those, so
+**every path returns `0`**, including a missing skill directory, a malformed payload, and an
+unwritable `TMPDIR`.
 
 ### Inert where it does not apply
 
@@ -510,7 +633,7 @@ plugin has no business maintaining a list of the plugins that might provide one.
 
 ### The risk worth naming
 
-`PreToolUse` accepting `additionalContext` is confirmed in the 2.1.259 output schema, but a
+`PreToolUse` accepting `additionalContext` is confirmed in the 2.1.263 output schema, but a
 client that ignores it drops the injection **with no signal** — the same silent-degradation
 class named under `check-size.sh`. Two things blunt it: the `UserPromptSubmit` trigger uses a
 long-established channel, and the two corrective hooks still catch whatever slips through. The
@@ -519,6 +642,9 @@ plan-time injection is an optimisation over the safeguard, never a replacement f
 Fixtures are in `plugins/general-code-style/tests/test_plan_rules.sh`, which redirects
 `TMPDIR` — the episode marker is real on-disk state, and a suite that wrote to the developer's
 own `TMPDIR` would suppress the injection in their next session.
+
+---
+
 ## The measurement engine
 
 Every number the style hooks report comes from `general-code-style/hooks/lib/`, a set of awk
@@ -544,7 +670,10 @@ awk -f "$LIB/limits.awk" -f "$LIB/text.awk" -f "$LIB/sizes.awk" \
 | `report.awk` | Records in, sweep report out |
 | `scope.awk` | Filters a path list down to source files |
 | `skip.awk` | Drops build output and dependency directories |
-| `offenders.awk` | Records in, the paths that actually broke a rule out |
+| `keys.awk` | Records in, a stable identity per finding out — what survives an edit shifting it |
+| `introduced.awk` | Records in, only the ones this request introduced out, against a baseline |
+| `unseen.awk` | Records in, only the ones not already raised this request out |
+| `sized.awk` | `FILE` records in, one compact line each out — the size, with no order to split |
 | `json.awk` | Scalars out of a hook payload, by dotted path; `all=1` for every match in an array |
 | `jsonout.awk` | Text in, one line of `additionalContext` hook JSON out |
 | `batch.awk` | Pairs tool names with paths in a batch, keeping only the calls that wrote |
@@ -565,6 +694,7 @@ WIDE <path> <name> <line> <params>  NOTE <path> <line> <text>
 | `PARAM_LIMIT` | 3 | Parameters per declaration before the extras must be grouped into a type |
 | `DECL_SPAN` | 12 | Lines a wrapped parameter list may span before it is given up on |
 | `MAX_WARNINGS` | 5 | Advisories shown before the rest collapse into a count |
+| `GROWTH_LIMIT` | 50 | Lines added to an already-oversized file before its shape becomes this request's |
 | `SOURCE` | allow-list | The one scope: what the hook measures and the sweep opens |
 
 File length is measured for the extensions in `SOURCE`, and nothing else. That set is the

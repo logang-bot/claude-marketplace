@@ -9,7 +9,12 @@
 # says, need judgement about what a reader would misunderstand: that is the style-reviewer
 # agent's job, not a script's.
 #
-# Usage: sweep.sh [path] [--top N] [--strict]
+# Usage: sweep.sh [path] [--top N] [--strict] [--dirty]
+#
+# `--dirty` narrows the sweep to what is not committed yet. That is the question worth asking
+# before a commit: the hooks report a file over the line cap rather than ordering a split, so an
+# unfixed one stays in the working tree, and the working tree is exactly where it can still be
+# dealt with cheaply. Paired with --strict it is a pre-commit gate.
 
 set -u
 ENGINE_LIB=${ENGINE_LIB:-$(dirname "$0")/../hooks/lib}
@@ -19,11 +24,13 @@ require_tools awk
 TARGET=.
 TOP=20
 STRICT=0
+DIRTY=0
 while [ $# -gt 0 ]; do
     case $1 in
         --top) TOP=$2; shift 2 ;;
         --top=*) TOP=${1#--top=}; shift ;;
         --strict) STRICT=1; shift ;;
+        --dirty) DIRTY=1; shift ;;
         -*) printf 'sweep: unknown option: %s\n' "$1" >&2; exit 2 ;;
         *) TARGET=$1; shift ;;
     esac
@@ -32,12 +39,33 @@ done
 TARGET=$(native_path "$TARGET")
 [ -e "$TARGET" ] || { printf 'sweep: no such path: %s\n' "$TARGET" >&2; exit 2; }
 
+# "Not committed yet" means nothing outside a repository, so say so rather than sweeping
+# everything and calling the result uncommitted.
+if [ "$DIRTY" -eq 1 ] && [ ! -f "$TARGET" ] \
+   && ! git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1; then
+    printf 'sweep: --dirty needs a git repository: %s\n' "$TARGET" >&2
+    exit 2
+fi
+
+# Everything that differs from HEAD — the same pair lib/turn.sh reads the tree through, so a
+# sweep and a hook can never disagree about what counts as uncommitted work.
+dirty_names() {
+    {
+        git -C "$TARGET" diff --name-only HEAD 2>/dev/null
+        git -C "$TARGET" ls-files --others --exclude-standard 2>/dev/null
+    } | LC_ALL=C sort -u
+}
+
 # Files git knows about, so .gitignore is respected for free; a plain walk when the target
 # is not a repository. The pipeline's status is the last command's, so git failing has to
 # be tested on its own rather than trusted to fall through an `&&`.
 candidates() {
     if [ -f "$TARGET" ]; then
         printf '%s\n' "$TARGET"
+        return
+    fi
+    if [ "$DIRTY" -eq 1 ]; then
+        dirty_names | awk -v prefix="$TARGET" '{ print prefix "/" $0 }'
         return
     fi
     tracked=$(git -C "$TARGET" ls-files 2>/dev/null) || tracked=""

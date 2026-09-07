@@ -10,6 +10,12 @@ function init_limits(   t, n, i) {
     DECL_SPAN = 12            # lines a parameter list may wrap across before we give up
     MAX_WARNINGS = 5          # advisories shown before the rest are summarised as a count
 
+    # Growth that makes an already-oversized file the turn's problem rather than inherited
+    # debt. A turn that adds a line to a 260-line file did not create that file's shape; one
+    # that adds this many owns the result. Set to the spare above the 200-line target, so
+    # raising FILE_LIMIT's allowance moves both together.
+    GROWTH_LIMIT = 50
+
     n = split("kt kts java js jsx ts tsx swift c cc cpp h hpp cs go rs scala php dart " \
               "gradle groovy", t, " ")
     for (i = 1; i <= n; i++) { BRACE[t[i]] = 1; MEASURED[t[i]] = 1; SOURCE[t[i]] = 1 }

@@ -130,8 +130,10 @@ checkout instead:
 
 Hook scripts are POSIX shell and awk, so they run wherever git does — including Git Bash on
 Windows, which is the shell Claude Code uses for hooks there. They read the hook payload on
-stdin and exit 2 to surface a message; every one exits 0 on malformed input, a missing file,
-or a non-git directory, so a broken hook degrades to silence rather than blocking work.
+stdin; the two guards in `dev-workflow` answer with exit 2, while the style hooks answer on
+stdout with `hookSpecificOutput.additionalContext`, which reaches the model as feedback rather
+than as an error. Every one exits 0 on malformed input, a missing file, or a non-git directory,
+so a broken hook degrades to silence rather than blocking work.
 
 ## Documentation
 
