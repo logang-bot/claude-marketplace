@@ -151,18 +151,22 @@ lint_files() {
     _tw=0
     tailwind_in_use "$_root" && _tw=1
     _brief=$(brief_file "$_root") || _brief=""
-    _fonts=""; _icon=""; _spacing=""
+    _fonts=""; _icon=""; _spacing=""; _radius=""; _types=""; _relax=""
     if [ -n "$_brief" ]; then
         _fonts=$(brief_value "$_brief" font-families | tr -d "\"'")
         _icon=$(brief_value "$_brief" icon-pack)
         _spacing=$(brief_value "$_brief" spacing-scale | tr -c '0-9.\n' ' ')
+        _radius=$(brief_value "$_brief" radius | tr -c '0-9.\n' ' ')
+        _types=$(brief_value "$_brief" type-scale | tr -c '0-9.\n' ' ')
+        _relax=$(brief_value "$_brief" relax | tr -c 'A-Za-z0-9\n-' ' ')
     fi
     while IFS= read -r _f; do
         [ -f "$_f" ] || continue
         extract_records "$_f" "$_tw"
     done | awk -f "$ENGINE_LIB/common.awk" -f "$ENGINE_LIB/color.awk" \
         -f "$ENGINE_LIB/crossfile.awk" -f "$ENGINE_LIB/lint.awk" \
-        -v fonts="$_fonts" -v icon="$_icon" -v spacing="$_spacing" 2>/dev/null
+        -v fonts="$_fonts" -v icon="$_icon" -v spacing="$_spacing" \
+        -v radius="$_radius" -v typescale="$_types" -v relax="$_relax" 2>/dev/null
 }
 
 # Findings in, the hook's bullet list out. $1 the root to show paths relative to, $2 the cap.

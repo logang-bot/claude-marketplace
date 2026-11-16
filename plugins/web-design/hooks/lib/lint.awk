@@ -1,7 +1,8 @@
 # Lint driver: D and M records in (from any number of files), findings out.
 #
 #   ... | awk -f common.awk -f color.awk -f crossfile.awk -f lint.awk \
-#             -v fonts=<a,b> -v icon=<pack> -v spacing="<n n n>"
+#             -v fonts=<a,b> -v icon=<pack> -v spacing="<n n n>" -v radius="<n n n>" \
+#             -v typescale="<n n n>" -v relax="<RULE-ID, RULE-ID>"
 #
 # Findings, tab separated:   F path line RULE message key
 #
@@ -10,8 +11,12 @@
 # finding that moves when lines are inserted above it is still recognised as already reported.
 #
 # Everything is read before anything is judged: a custom property may be defined after the rule
-# that uses it, and contrast needs both colours of a block. `fonts`, `icon` and `spacing` come
-# from the project's DESIGN.md when it has one; each is optional.
+# that uses it, and contrast needs both colours of a block. `fonts`, `icon`, `spacing`, `radius`,
+# `typescale` and `relax` come from the project's DESIGN.md when it has one; each is optional.
+#
+# `relax` lists rules the project's style deliberately breaks — a neo-brutalist site's opaque black
+# shadows, an editorial site's justified columns. Those rules are not reported. Contrast (COLOR-11)
+# and body-text size (TYPO-05) protect legibility whatever the style, so they cannot be relaxed.
 #
 # Every check is advisory. The skill rules are guidelines a personality can bend — a Bold site
 # may set a 12px all-caps eyebrow on purpose — so the wording invites a one-line reason to keep
@@ -39,6 +44,12 @@ function lint_main(   d, m, sc, n, i) {
     n = split(spacing == "" ? "0 2 4 8 12 16 24 32 48 64 80 96 128" : spacing, sc, /[ ,]+/)
     for (i = 1; i <= n; i++) if (sc[i] != "") SCALE[sc[i] + 0] = 1
     SCALE_TEXT = spacing == "" ? "2/4/8/12/16/24/32/48/64/80/96/128" : spacing
+    n = split(radius, sc, /[ ,]+/)
+    for (i = 1; i <= n; i++) if (sc[i] != "") { RADII[sc[i] + 0] = 1; if (sc[i] + 0 >= 999) RADIUS_PILL = 1 }
+    n = split(typescale, sc, /[ ,]+/)
+    for (i = 1; i <= n; i++) if (sc[i] != "") TYPESCALE[++NTYPESCALE] = sc[i] + 0
+    n = split(toupper(relax), sc, /[ ,]+/)
+    for (i = 1; i <= n; i++) if (sc[i] != "" && sc[i] != "COLOR-11" && sc[i] != "TYPO-05") RELAXED[sc[i]] = 1
     for (d = 1; d <= ND; d++) lint_collect_block(d)
     for (d = 1; d <= ND; d++) lint_decl(d)
     lint_contrast()
@@ -47,6 +58,7 @@ function lint_main(   d, m, sc, n, i) {
 }
 
 function lint_find(p, line, rule, msg, key) {
+    if (rule in RELAXED) return
     gsub(/\t/, " ", msg)
     printf "F\t%s\t%d\t%s\t%s\t%s\n", p, line, rule, msg, rule "|" p "|" key
 }
@@ -150,6 +162,7 @@ function lint_decl(d,   p, v, raw) {
     else if (p ~ /^text-decoration(-line)?$/ && v ~ /underline/ && !lint_linksel(DS[d]))
         lint_dfind(d, "UX-03", "underline on `" DS[d] "`, which is not a link — reserve underlined (and blue) text for links")
     else if (p ~ /^(margin|padding)(-(top|right|bottom|left|inline|block)(-(start|end))?)?$/ || p ~ /^(gap|row-gap|column-gap)$/) lint_spacing(d, v)
+    else if (p ~ /^border(-(top|bottom|start|end)-(left|right|start|end))?-radius$/) lint_radius(d, v)
     if (p ~ /^(color|background|background-color|border|border-(top|right|bottom|left)(-color)?|border-color|outline|outline-color|fill|stroke|box-shadow|text-shadow|text-decoration-color|caret-color|accent-color)$/) lint_named(d, raw)
     if (DSRC[d] != "tw") crossfile_colors(d, raw)
 }
@@ -170,7 +183,8 @@ function lint_font_shorthand(d, v,   t, n, i) {
 
 function lint_size(d, v,   px) {
     if (v == "") return
-    crossfile_size(d, v)
+    if (NTYPESCALE > 0) lint_typescale(d, v)
+    else crossfile_size(d, v)
     if (!lint_bodytext(DS[d]) || tolower(DS[d]) ~ /(^|[ ,])(html|:root)$/) return
     px = (v ~ /^[0-9.]+%$/) ? (v + 0) * 0.16 : lint_px(v, 16)
     if (px > 0 && px < 16)
@@ -292,6 +306,36 @@ function lint_spacing(d, v,   toks, n, i, t, px, a, bad) {
     }
     if (bad != "")
         lint_dfind(d, "SPACE-08", DPR[d] " " DV[d] " on `" DS[d] "` — " bad " off the spacing scale (" SCALE_TEXT ")")
+}
+
+# With a type scale in DESIGN.md, every literal size must be on it. Fluid sizes (clamp, calc...)
+# and Tailwind's own scale are left alone; rem gets half a pixel of slack for rounding.
+function lint_typescale(d, v,   px, i) {
+    if (DSRC[d] == "tw" || v ~ /\(/) return
+    px = lint_px(v, 16)
+    if (px <= 0 || v ~ /[0-9]em$/ && v !~ /rem$/) return
+    for (i = 1; i <= NTYPESCALE; i++) if (px - TYPESCALE[i] <= 0.5 && TYPESCALE[i] - px <= 0.5) return
+    lint_dfind(d, "TYPO-04", "font-size " DV[d] " on `" DS[d] "` is not on the type scale (" typescale ")")
+}
+
+# Corner radii. With a radius scale in DESIGN.md, every value must be on it; without one, the file
+# may use at most four distinct radii. Percentages (circles) and zero are always fine, and any
+# value of 999px or more counts as a pill when the scale has one.
+function lint_radius(d, v,   toks, n, i, t, px, bad) {
+    if (DSRC[d] == "tw" || v == "" || v ~ /\(/) return
+    if (radius == "") { crossfile_radius(d, v); return }
+    n = split(v, toks, /[ \/]+/)
+    bad = ""
+    for (i = 1; i <= n; i++) {
+        t = toks[i]
+        if (t == "" || t ~ /%$/) continue
+        px = lint_px(t, 16)
+        if (px < 0) continue
+        if (px == 0 || (px >= 999 && RADIUS_PILL) || (px == int(px) && (px in RADII))) continue
+        bad = bad (bad == "" ? "" : ", ") t
+    }
+    if (bad != "")
+        lint_dfind(d, "RADIUS-04", DPR[d] " " DV[d] " on `" DS[d] "` — " bad " off the radius scale (" radius ")")
 }
 
 # Text against a background set in the same block: same CSS rule, same inline style, same element.

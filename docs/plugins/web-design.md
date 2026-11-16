@@ -43,6 +43,8 @@ Rule IDs combine an area and a number, so `TYPO-08` is typography rule 8 in the
 | Get a fast health check, or track progress over time | `/design-audit <path> --lint-only` |
 | Change the design direction (rebrand, new personality) | `/design-brief` (update) → re-apply tokens → `/design-audit --lint-only` |
 | Write down the design an existing project already uses | `/design-brief` |
+| Use a style that fits none of the seven personalities | `/design-brief "neo-brutalist, mono type, hard shadows"` → normal workflow |
+| Keep an existing project's own style, which fits none of the seven | `/design-audit src --lint-only` → `/design-brief custom` → normal workflow |
 | Review only the copy, CTAs and page structure | Ask for a UX review of the page (starts `ux-reviewer`) |
 | Fix contrast and legibility across a project | `/design-audit <path> --lint-only`, then ask to fix `COLOR-11`, `TYPO-05`, `TYPO-08` findings |
 | Go deep on one design area | Call the skill by hand, e.g. `/web-design:setting-typography` |
@@ -89,6 +91,31 @@ Note that when Claude edits a file, the hooks only report findings on the lines 
 request like "fix the typography" on an old file will not surface the rest of its problems on its
 own: that is what `/design-audit` is for.
 
+### A style outside the seven personalities
+
+The seven personalities are starting points, not a boundary. Two situations fall outside them:
+- a new project whose wanted style fits none of them (neo-brutalist, Swiss, retro-terminal...)
+- an existing project with a coherent style of its own
+
+In both, `DESIGN.md` records a **custom personality** and the checks follow it.
+
+1. **`/design-brief` with a description**, e.g. `/design-brief "neo-brutalist, mono type, hard
+   shadows"`, or `/design-brief custom` for an existing project. Claude writes `personality:
+   custom — <label>` and a `## Personality` table that defines the style by the same ingredients
+   the seven use: typography, colour, images, icons, shadows, border-radius, layout. For an
+   existing project, it describes what the code already does and takes the tokens from it: the
+   families, radii, spacing and font sizes in use.
+2. **Relax what the style breaks on purpose.** Claude proposes a `relax` list of guideline rules
+   the style breaks deliberately, for example `SHADOW-03` for hard black shadows or `TYPO-13` for
+   justified columns. You confirm it, and each rule gets a reason under `## Relaxed rules`. Relaxed
+   rules are no longer reported, and the audit lists them so a clean result is never misleading.
+3. **Everything else keeps working against your tokens.** Spacing, radius, type scale, fonts and
+   icon pack are checked against the brief's values, not the defaults, and the reviewer agents
+   judge consistency with the custom ingredient table.
+
+Two rules cannot be relaxed whatever the style: **contrast (`COLOR-11`)** and **body-text size
+(`TYPO-05`)**. If either is listed in `relax`, it is still reported and the audit says so.
+
 ### Other common cases
 
 - **Adding a page to a project that has a brief.** No command needed: ask for the page. The rules
@@ -109,26 +136,33 @@ own: that is what `/design-audit` is for.
 
 ## Commands
 
-### `/design-brief [personality]`
+### `/design-brief [personality | custom | "description"]`
 
 **Decides the design and writes it down.** It does not check code.
 
 | | |
 |---|---|
-| Argument | Optional personality: `serious-elegant`, `minimalist-simple`, `plain-neutral`, `bold-confident`, `calm-peaceful`, `startup-upbeat`, `playful-fun` |
+| Argument | Optional. A personality slug (`serious-elegant`, `minimalist-simple`, `plain-neutral`, `bold-confident`, `calm-peaceful`, `startup-upbeat`, `playful-fun`), `custom`, or a free description of the style you want |
 | Reads | `DESIGN.md` if present; the README, existing pages and `package.json` to learn what the site is for |
 | Asks you | Only what it cannot infer: purpose, audience, desired feeling. One short round at most. It does not ask you to pick a style; it recommends one |
-| Writes | `DESIGN.md`: personality with a one-line reason, audience and goal, and the `tokens` block |
+| Writes | `DESIGN.md`: personality with a one-line reason (and an ingredient table for a custom one), audience and goal, relaxed rules with reasons, and the `tokens` block |
 | Offers | To mirror the tokens into existing stylesheets, the Tailwind theme, or a theme object |
 
 Steps:
 
 1. If `DESIGN.md` exists, it summarises it and asks what should change, then edits only that.
 2. Otherwise it works out purpose and audience, asking only what is missing.
-3. It recommends a personality (the `choosing-a-website-personality` skill). If you named one, it
-   is used, with a warning if it fits the audience poorly.
-4. It derives the tokens from that personality and writes `DESIGN.md` in the
-   `writing-a-design-brief` format.
+3. It settles the personality (the `choosing-a-website-personality` skill):
+   - **You named one of the seven:** it is used, with a warning if it fits the audience poorly.
+   - **You described a style:** it is matched to one of the seven or a blend, or recorded as
+     custom when none fits.
+   - **Nothing given:** it recommends one, or custom if none fits.
+   - **Existing project that fits none:** its own style is recorded as custom.
+4. It derives the tokens: from the personality's table, from the custom ingredient table, or from
+   the values already in the code.
+5. It proposes rules to relax, for a style that breaks guideline rules on purpose, and confirms
+   them with you.
+6. It writes `DESIGN.md` in the `writing-a-design-brief` format.
 
 It finishes with a three-line summary: personality, typeface(s) and main colour, icon pack.
 
@@ -152,7 +186,7 @@ Steps:
    layout and design-system files are left out unless the description is about them. The files are
    listed to you in one line before the audit. If nothing plausible matches, or two areas match
    equally, it asks.
-1. **Lint (always).** Runs `scripts/audit.sh` on the target: the 20 measurable rules below. No AI
+1. **Lint (always).** Runs `scripts/audit.sh` on the target: the 21 measurable rules below. No AI
    reads the files in this step.
 2. **Judgement review**, for no path or 30 files or fewer, and no `--lint-only`. Starts
    `design-reviewer`, and `ux-reviewer` too when the target has markup, in parallel. When step 0
@@ -177,13 +211,13 @@ they have to be reachable before any file exists.
 
 | Skill | Covers | Loads when | Linted as |
 |---|---|---|---|
-| `choosing-a-website-personality` | The 7 personalities and what each implies for typeface, colour, images, icons, shadows, radius and layout; how to pick one | A site or page is being designed, or a look and feel is asked for | — |
+| `choosing-a-website-personality` | The 7 personalities and what each implies for typeface, colour, images, icons, shadows, radius and layout; how to pick one, blend two, or define a custom one when none fits | A site or page is being designed, or a look and feel is asked for | — |
 | `writing-a-design-brief` | The `DESIGN.md` format and its machine-read `tokens` block | `DESIGN.md` is created or its tokens change; `/design-brief` | — |
 | `setting-typography` | One or two proven typefaces, a type scale, 16–32px body text (20px+ for long reads), weight ≥ 400, under 75 characters a line, line-height 1.5–2, no justified or long centred text | Fonts, sizes, weights, line-height or alignment are written | `TYPO-02 04 05 08 09 10 13` |
 | `building-color-palettes` | Main colour plus grey, tints and shades defined once as tokens, colour for emphasis, no pure black, 4.5:1 contrast | Colours, themes or backgrounds are chosen | `COLOR-02 03 10 11` |
 | `using-images-and-illustrations` | Relevant, original-looking images, real people, three ways to put text over an image, 2x resolution, compression, matching sizes side by side | Images, heroes, galleries or backgrounds are added | `IMG-12` |
 | `using-icons` | One SVG icon pack matched to the type, icons with text, labelled actions, text-coloured by default, enclosed in a shape rather than scaled up | Icons or an icon library are added | `ICON-02 03` |
-| `applying-shadows-and-radius` | Shadows only if the personality allows, light, sparse, sm/md/lg by element size, changing on hover; radius matched to the typeface | `box-shadow` or `border-radius` is written | `SHADOW-02 03` |
+| `applying-shadows-and-radius` | Shadows only if the personality allows, light, sparse, sm/md/lg by element size, changing on hover; radius matched to the typeface and taken from a small fixed set | `box-shadow` or `border-radius` is written | `SHADOW-02 03`, `RADIUS-04` |
 | `spacing-with-whitespace` | More space between sections than groups, and groups than elements; proximity; space instead of lines; a fixed spacing scale | Margin, padding or gap is written, or a layout is spaced | `SPACE-08` |
 | `establishing-visual-hierarchy` | Important things first, images used mindfully, emphasis through size, weight, colour and whitespace, de-emphasising neighbours | A page or section is laid out, or elements compete for attention | — (agents only) |
 | `designing-for-user-experience` | Familiar patterns, a prominent and descriptive CTA, links-only underline, 200–500ms animations, single-column forms, feedback, plain copy | CTAs, forms, navigation, animation or copy are written | `UX-02 03 04` |
@@ -246,9 +280,11 @@ State lives in `${TMPDIR:-/tmp}/web-design/<session>.*`.
 | Calm/Peaceful | Pastels, soft serif headings, matching imagery | Healthcare, wellness |
 | Startup/Upbeat | Medium sans-serif, light-grey text and backgrounds, rounded elements | SaaS, modern tech |
 | Playful/Fun | Colourful and round, hand-drawn illustrations, animation | Children's products, pets, food |
+| Custom | Whatever the brief's ingredient table defines | Anything the seven do not cover |
 
-A personality changes *which* typeface, colour or radius is used. It never changes the floor
-rules: weight 400 or above, contrast 4.5:1, body text 16px or larger.
+A personality changes *which* typeface, colour or radius is used. Two rules hold for every style,
+custom ones included, and cannot be relaxed: contrast 4.5:1 and body text 16px or larger. The
+other guideline rules are defaults that a custom style may relax in `DESIGN.md`, with a reason.
 
 ## `DESIGN.md`
 
@@ -273,7 +309,11 @@ shadows: sm 0 1px 3px rgba(0,0,0,.1); md 0 4px 12px rgba(0,0,0,.08)
 | `font-families` | The linter: any other family is flagged as `TYPO-02` |
 | `icon-pack` | The linter: any other pack is flagged as `ICON-02` |
 | `spacing-scale` | The linter: replaces the default scale for `SPACE-08` |
-| `personality`, `type-scale`, `palette`, `radius`, `shadows` | People and the agents |
+| `type-scale` | The linter: any literal font-size off the scale is flagged as `TYPO-04` (fluid `clamp()` sizes and Tailwind's own scale are exempt) |
+| `radius` | The linter: any border-radius off the scale is flagged as `RADIUS-04`. `0` and percentages are always allowed; a value of 999+ allows pills |
+| `relax` | The linter and the agents: these rule IDs are not reported. `COLOR-11` and `TYPO-05` cannot be relaxed |
+| `personality` | People and the agents: a slug such as `startup-upbeat`, or `custom — <label>` |
+| `palette`, `shadows` | People and the agents |
 
 Without a brief the linter falls back to the generic rules, and Claude asks you once per session,
 before building new pages, whether to create one or let it decide the style.
@@ -311,16 +351,18 @@ syntax) is not read.
 | `SHADOW-03` | Neutral shadow colours above 0.25 alpha, or a shadow with no colour |
 | `COLOR-02` | CSS named colours (except `white`, `transparent`, `currentColor`) |
 | `TYPO-09` | A text measure over ~75 characters |
-| `TYPO-04` | More than 12 distinct font sizes in a file |
+| `TYPO-04` | A font-size off DESIGN.md's `type-scale`; without one, more than 12 distinct font sizes in a file |
 | `COLOR-03` | More than 16 distinct raw colour literals in a file |
 | `SHADOW-02` | More than 4 distinct box-shadows in a file |
+| `RADIUS-04` | A border-radius off DESIGN.md's `radius` scale; without one, more than 4 distinct radii in a file |
 | `IMG-12` | Neighbouring images with different `width`/`height` |
 | `SPACE-08` | Margin, padding or gap off the spacing scale |
 
 The table runs in report order, most important to a reader first. Findings of one rule in one
 file collapse into a single line, so thirty off-scale paddings cost one line and cannot crowd out a
 contrast failure. Every finding is advisory: a rule bent on purpose for the personality can be
-kept, with a one-line reason.
+kept, with a one-line reason. A rule the style breaks every time belongs in DESIGN.md's `relax`
+instead, so it stops being reported.
 
 **Tailwind** classes are read only when the project uses Tailwind (`tailwind.config.*`, or
 `tailwindcss` in `package.json`). Standard utilities are already on Tailwind's scales, so they are

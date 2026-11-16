@@ -17,7 +17,7 @@ paths: "**/*.css,**/*.scss,**/*.less,**/*.html,**/*.htm,**/*.vue,**/*.svelte,**/
 8. Main-page headline: descriptive and keyword-focused, never vague or fancy.
 9. Include only relevant information; cut the fluff.
 10. Use simple words; avoid jargon and "smart-sounding" words.
-11. Break up long text with sub-headings, images, block quotes and bullet points.
+11. Break up long text: sub-headings, images, quotes, bullet points.
 
 ## Applying it
 

@@ -1,7 +1,7 @@
 {
   "name": "web-design",
-  "description": "Web design rules for typography, color, images, icons, shadows, border-radius, whitespace, visual hierarchy, UX, and layout, all driven by a chosen website personality. Hooks inject the rules before UI code is written and lint CSS, HTML, Tailwind, and CSS-in-JS afterwards; reviewer agents cover the judgement calls.",
-  "version": "0.1.2",
+  "description": "Web design rules for typography, color, images, icons, shadows, border-radius, whitespace, visual hierarchy, UX, and layout, all driven by a website personality (one of seven, or a custom one). Hooks inject the rules before UI code is written and lint CSS, HTML, Tailwind, and CSS-in-JS afterwards; reviewer agents cover the judgement calls.",
+  "version": "0.2.0",
   "author": {
     "name": "logang-bot"
   },

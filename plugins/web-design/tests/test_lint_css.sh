@@ -124,6 +124,45 @@ out=$(printf '%s\n' "$WORK/briefed/c.css" | lint_files "$WORK/briefed")
 check "the brief's spacing scale replaces the default" "$(printf '%s\n' "$out" | grep -c "SPACE-08.*24px" | tr -d ' ')" "1"
 check "a value on the brief's scale passes" "$(printf '%s\n' "$out" | grep -c "SPACE-08.*32px" | tr -d ' ')" "0"
 
+# --- radius ------------------------------------------------------------------
+
+flags "a fifth distinct radius without a brief" r1.css RADIUS-04 '.a{border-radius:2px} .b{border-radius:4px} .c{border-radius:6px} .d{border-radius:8px} .e{border-radius:10px}'
+passes "four radii, zero and a circle without a brief" r2.css RADIUS-04 '.a{border-radius:2px} .b{border-radius:4px} .c{border-radius:6px} .d{border-radius:8px} .e{border-radius:0} .f{border-radius:50%}'
+
+# --- a custom style: radius and type scales, relaxed rules -------------------
+
+mkdir -p "$WORK/custom"
+cat > "$WORK/custom/DESIGN.md" <<'EOF'
+# Design brief
+
+## Personality
+Custom — neo-brutalist.
+
+```tokens
+personality: custom — neo-brutalist
+radius: 0 4 8 9999
+type-scale: 12 14 16 18 24
+relax: SHADOW-03, COLOR-10, COLOR-11
+```
+EOF
+cust() {
+    printf '%s\n' "$2" > "$WORK/custom/$1"
+    printf '%s\n' "$WORK/custom/$1" | lint_files "$WORK/custom"
+}
+out=$(cust a.css '.a { border-radius: 6px; } .b { border-radius: 8px 4px; } .c { border-radius: 50%; } .d { border-radius: 9999px; } .e { border-radius: var(--r); } .f { border-radius: 0.5rem; }')
+check "a radius off the brief's scale is flagged" "$(printf '%s\n' "$out" | grep -c 'RADIUS-04.*6px' | tr -d ' ')" "1"
+check "radii on the scale, circles, pills and variables pass" "$(printf '%s\n' "$out" | grep -c 'RADIUS-04' | tr -d ' ')" "1"
+out=$(cust b.css 'h1 { font-size: 15px; } p { font-size: 16px; } h2 { font-size: 1.125rem; } h3 { font-size: clamp(1rem, 2vw, 1.5rem); }')
+check "a size off the brief's type scale is flagged" "$(printf '%s\n' "$out" | grep -c 'TYPO-04.*15px' | tr -d ' ')" "1"
+check "sizes on the scale, in rem, and fluid pass" "$(printf '%s\n' "$out" | grep -c 'TYPO-04' | tr -d ' ')" "1"
+out=$(cust c.css '.card { box-shadow: 4px 4px 0 #000; color: #000; } p { color: #999; background: #fff; }')
+check "a relaxed shadow rule is not reported" "$(printf '%s\n' "$out" | grep -c '	SHADOW-03	' | tr -d ' ')" "0"
+check "relaxed pure black text is not reported" "$(printf '%s\n' "$out" | grep -c '	COLOR-10	' | tr -d ' ')" "0"
+check "contrast cannot be relaxed" "$(printf '%s\n' "$out" | grep -c '	COLOR-11	' | tr -d ' ')" "1"
+audit=$(sh "$HERE/../scripts/audit.sh" "$WORK/custom/c.css" 2>&1)
+check "the audit names the relaxed rules" "$(printf '%s\n' "$audit" | grep -c 'Relaxed by DESIGN.md (not reported): SHADOW-03, COLOR-10' | tr -d ' ')" "1"
+check "the audit says contrast cannot be relaxed" "$(printf '%s\n' "$audit" | grep -c 'COLOR-11, which cannot be relaxed' | tr -d ' ')" "1"
+
 # --- audit script ------------------------------------------------------------
 
 printf 'p { font-weight: 300; }\n' > "$WORK/briefed/d.css"

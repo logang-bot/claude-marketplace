@@ -66,14 +66,31 @@ if [ -z "$files" ]; then
     exit 0
 fi
 
+# Rules the brief switches off are not reported, so say which ones, or a clean audit could be
+# mistaken for a clean bill of health. Contrast and body-text size cannot be switched off.
+brief=$(brief_file "$root") || brief=""
+relax_note=""
+if [ -n "$brief" ]; then
+    relaxed=$(brief_value "$brief" relax | tr -c 'A-Za-z0-9\n-' ' ' | tr 'a-z' 'A-Z' | awk '{
+        for (i = 1; i <= NF; i++) { if ($i == "COLOR-11" || $i == "TYPO-05") bad = bad (bad ? ", " : "") $i; else ok = ok (ok ? ", " : "") $i }
+    } END { print ok "|" bad }')
+    [ -n "${relaxed%%|*}" ] && relax_note="Relaxed by DESIGN.md (not reported): ${relaxed%%|*}"
+    if [ -n "${relaxed#*|}" ]; then
+        relax_note="${relax_note:+$relax_note
+}DESIGN.md lists ${relaxed#*|}, which cannot be relaxed; still reported."
+    fi
+fi
+
 findings=$(printf '%s\n' "$files" | lint_files "$root")
 count=$(printf '%s\n' "$files" | grep -c .)
 if [ -z "$findings" ]; then
     printf '%s\n' "web-design audit: $count file(s) checked, no findings."
+    [ -n "$relax_note" ] && printf '%s\n' "$relax_note"
     exit 0
 fi
 
 printf '%s\n' "$findings" | awk -f "$ENGINE_LIB/report.awk" -v mode=audit -v root="$root" -v limit="$TOP"
 printf '%s\n' "($count file(s) checked. Measurable rules only — hierarchy, imagery, copy and personality fit need /design-audit.)"
+[ -n "$relax_note" ] && printf '%s\n' "$relax_note"
 [ "$STRICT" = 1 ] && exit 1
 exit 0

@@ -20,6 +20,7 @@ paths: "**/*.css,**/*.scss,**/*.less,**/*.html,**/*.htm,**/*.vue,**/*.svelte,**/
 1. Border-radius adds playfulness and makes a design less serious.
 2. Match the radius to the typeface's roundness.
 3. Use it on buttons, images, around icons, standout sections and similar.
+4. Take radius values from a small fixed set.
 
 ## Applying it
 
@@ -43,5 +44,8 @@ paths: "**/*.css,**/*.scss,**/*.less,**/*.html,**/*.htm,**/*.vue,**/*.svelte,**/
 ## What the hook checks
 
 `SHADOW-03` neutral box-shadow colours above 0.25 alpha, or a shadow with no colour (it falls back
-to the text colour at full opacity); `SHADOW-02` more than four distinct box-shadows in one file.
-Radius fit is the `design-reviewer` agent's call.
+to the text colour at full opacity); `SHADOW-02` more than four distinct box-shadows in one file;
+`RADIUS-04` border-radius values off DESIGN.md's `radius` scale, or more than four distinct radii
+in a file when the brief has none (`0`, percentages and Tailwind's standard `rounded-*` are
+exempt). Whether the radius suits the typeface is the `design-reviewer` agent's call. A custom
+style built on hard black shadows can relax `SHADOW-03` in DESIGN.md.

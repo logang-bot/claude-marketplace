@@ -19,9 +19,13 @@ that hold styled-components or JSX).
 ## Before reading any code
 
 1. Read `DESIGN.md` at the project root if it exists. Its personality and tokens are what you judge
-   against. If there is none, infer the personality from the content and say which one you
-   assumed.
-2. Run the mechanical audit and keep its output. Find the script by globbing
+   against. A custom personality (`personality: custom — <label>`) is judged against its own
+   `## Personality` ingredient table, not against the nearest of the seven. If there is no brief,
+   infer the personality from the content — one of the seven, or describe the style if none fits —
+   and say which you assumed.
+2. Rules listed in the brief's `relax` token are part of the style: never report them. Contrast
+   (COLOR-11) and body-text size (TYPO-05) cannot be relaxed and are always in scope.
+3. Run the mechanical audit and keep its output. Find the script by globbing
    `**/web-design/scripts/audit.sh` rather than assuming an install path, then run
    `sh <path>/audit.sh <paths>`, or `sh <path>/audit.sh --dirty` for the working tree.
    Confirm its findings, but do not spend your effort re-deriving them.
@@ -35,7 +39,7 @@ that hold styled-components or JSX).
 | Colour (COLOR 1, 3–9) | Does the main colour suit the personality? Is it reserved for what matters most, or spread everywhere? Are tints and shades used? Is text on dark sections a tint of the background? |
 | Images (IMG 1–11) | Relevant to the message? Original-looking, or generic stock? Real people where emotion matters? Is text over images legible, using one of the three methods? Sized at 2x and compressed? |
 | Icons (ICON 1, 4–11) | Does the pack's weight and roundness match the type? Do icons make sense for their text? Are action icons labelled? Are icons scaled past their design size instead of being enclosed in a shape? |
-| Shadows and radius (SHADOW 1–2, 4–8; RADIUS 1–3) | Do shadows suit the personality at all? Are they on too many elements? Is their size proportional to the element? Does the radius match the typeface's roundness? |
+| Shadows and radius (SHADOW 1–2, 4–8; RADIUS 1–4) | Do shadows suit the personality at all? Are they on too many elements? Is their size proportional to the element? Does the radius match the typeface's roundness? |
 | Whitespace (SPACE 1–7) | Is there clearly more space between sections than between groups, and between groups than between elements? Do related things sit closer than unrelated ones? Are divider lines used where space would do? |
 | Visual hierarchy (HIER 1–8) | For each section, what is seen first? Is that the most important thing? Do two things compete? Is anything emphasised that should be de-emphasised? |
 

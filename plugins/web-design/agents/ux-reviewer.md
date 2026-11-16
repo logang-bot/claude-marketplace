@@ -14,7 +14,7 @@ design-reviewer.
 If given paths, review those. If given nothing, review the uncommitted working tree:
 `git diff --name-only HEAD` plus `git ls-files --others --exclude-standard`, keeping markup and
 component files. Read `DESIGN.md` at the project root first, if it exists, for the audience and
-goal.
+goal. Rules listed in its `relax` token are deliberate parts of the style: do not report them.
 
 ## The rules
 

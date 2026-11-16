@@ -12,9 +12,9 @@ paths: "**/*.css,**/*.scss,**/*.less,**/*.html,**/*.htm,**/*.vue,**/*.svelte,**/
 3. Whitespace separates, so use it strategically to emphasise.
 4. Convey text importance with size, weight, colour and whitespace.
 5. Emphasise titles, sub-titles, links, buttons, data points and icons.
-6. Emphasise a component with background colour, shadow or border (or several).
+6. Emphasise a component with background, shadow or border.
 7. Emphasise A over B by de-emphasising B.
-8. Emphasise testimonials, CTA sections, highlights, preview cards, forms, pricing tables, key table rows and columns.
+8. Emphasise testimonials, CTAs, highlights, cards, forms, pricing tables, key table rows.
 
 ## Applying it
 

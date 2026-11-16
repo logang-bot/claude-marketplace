@@ -102,6 +102,16 @@ check "standard spacing utilities pass" "$(printf '<div class="p-5 mt-7 gap-3">x
 check "underline on a button is flagged" "$(printf '<button class="underline">Save changes</button>\n' | count tw j.html UX-03)" "1"
 check "underline on a link passes" "$(printf '<a class="underline" href="/x">Pricing</a>\n' | count tw k.html UX-03)" "0"
 
+# --- radius against a brief --------------------------------------------------
+
+mkdir -p "$WORK/twbrief"
+cp "$WORK/tw/package.json" "$WORK/twbrief/"
+printf '# Brief\n\n```tokens\nradius: 0 8 9999\n```\n' > "$WORK/twbrief/DESIGN.md"
+check "an arbitrary off-scale rounded class is flagged" "$(printf '<div class="rounded-[6px]">x</div>\n' | count twbrief a.html RADIUS-04)" "1"
+check "a standard rounded class passes" "$(printf '<div class="rounded-lg rounded-t-[8px]">x</div>\n' | count twbrief b.html RADIUS-04)" "0"
+check "a JSX borderRadius number is read as px" \
+    "$(printf 'export const A = () => <div style={{ borderRadius: 6 }}>x</div>;\n' | count twbrief c.jsx RADIUS-04)" "1"
+
 if [ "$FAILURES" -eq 0 ]; then echo "PASSED — 0 failures"; exit 0; fi
 echo "FAILED — $FAILURES failures"
 exit 1

@@ -107,6 +107,7 @@ skills load on their own and the hooks apply the rules whether or not a skill wa
 |---|---|
 | Start a new web app | `/design-brief` → build page by page → `/design-audit <page>` |
 | Revise an existing project | `/design-audit src --lint-only` → `/design-brief` → `/design-audit <page>` per page |
+| A style that fits none of the seven personalities | `/design-brief "describe the style"` (or `/design-brief custom` for an existing project) |
 | Review one page or section | `/design-audit the pricing page` |
 | Check uncommitted work | `/design-audit` |
 
@@ -114,22 +115,22 @@ More use cases, and every component in detail: [`docs/plugins/web-design.md`](do
 
 | Component | Name | What it does |
 |---|---|---|
-| Command | `/design-brief [personality]` | Decides the design: asks what it cannot infer about purpose, audience and feel, recommends a personality, and writes `DESIGN.md` with its tokens. Does not check code |
+| Command | `/design-brief [personality \| custom \| "description"]` | Decides the design: asks what it cannot infer about purpose, audience and feel, picks one of seven personalities or defines a custom one, and writes `DESIGN.md` with its tokens and any rules the style deliberately relaxes. Does not check code |
 | Command | `/design-audit [path or description] [--dirty] [--lint-only]` | Checks code against the rules and `DESIGN.md`: always the linter, plus both reviewer agents on a target of 30 files or fewer. Accepts paths or a page named in plain words; no argument means uncommitted work; `--lint-only` skips the agents |
-| Skill | `choosing-a-website-personality` | Seven personalities, and the typeface, colour, imagery, icon, shadow, radius and layout each implies |
+| Skill | `choosing-a-website-personality` | Seven personalities and what each implies, plus blends and custom personalities when none fits |
 | Skill | `writing-a-design-brief` | The `DESIGN.md` format, including the `tokens` block the linter reads |
 | Skill | `setting-typography` | One or two proven typefaces, a type scale, 16–32px body text, weight ≥ 400, < 75 characters a line, line-height 1.5–2 |
 | Skill | `building-color-palettes` | Main colour plus grey, tints and shades as tokens, no pure black, 4.5:1 contrast |
 | Skill | `using-images-and-illustrations` | Relevant, original-looking imagery, three ways to put text over images, 2x and compressed, matching dimensions |
 | Skill | `using-icons` | One SVG pack matched to the type, text-coloured, enclosed in a shape rather than scaled up |
-| Skill | `applying-shadows-and-radius` | Light shadows in a sm/md/lg scale, radius matched to the typeface |
+| Skill | `applying-shadows-and-radius` | Light shadows in a sm/md/lg scale, radius matched to the typeface and taken from a fixed set |
 | Skill | `spacing-with-whitespace` | Section > group > element spacing, proximity, a fixed spacing scale |
 | Skill | `establishing-visual-hierarchy` | Position, size, weight, colour and whitespace to rank what matters |
 | Skill | `designing-for-user-experience` | Known patterns, descriptive CTAs, links-only underline, 200–500ms animation, single-column forms, plain copy |
 | Skill | `composing-components-and-layouts` | A catalogue of components and layout patterns, assembled into a page |
 | Agent | `design-reviewer` | Read-only review of personality fit and visual design (areas 01–08): the judgement calls the linter cannot make |
 | Agent | `ux-reviewer` | Read-only review of UX, copy and layout (areas 09–10) |
-| Script | `scripts/audit.sh` | The linter: 20 measurable rules over CSS, HTML, Tailwind and CSS-in-JS. `--dirty` for uncommitted files, `--strict` to use it as a pre-commit gate |
+| Script | `scripts/audit.sh` | The linter: 21 measurable rules over CSS, HTML, Tailwind and CSS-in-JS, following DESIGN.md's scales and relaxed rules. `--dirty` for uncommitted files, `--strict` to use it as a pre-commit gate |
 | Hook | `SubagentStart` | Gives subagents in a web project the rules, since they never load the skills themselves |
 | Hook | `UserPromptSubmit` | Records the uncommitted web files as a baseline. When a prompt is about design, tells Claude to settle the personality first; without `DESIGN.md`, Claude asks you before building new pages whether to create it with `/design-brief` or let it decide the style |
 | Hook | `PreToolUse` | Gives Claude the rules just before its first page or stylesheet write of the session; without `DESIGN.md`, the first new page also triggers the create-or-decide question |

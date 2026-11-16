@@ -13,11 +13,11 @@ paths: "**/*.css,**/*.scss,**/*.less,**/*.html,**/*.htm,**/*.vue,**/*.svelte,**/
 4. Match roundness, weight and filled/outlined style to the typography.
 5. Use icons as visual support for text.
 6. Use icons in product feature blocks.
-7. Pair icons with actions and label them, unless space is tight or the icon is 100% clear.
+7. Label action icons, unless space is tight or the icon is 100% clear.
 8. Icons work as bullet points.
 9. Neutral icons use the text colour; a different colour draws attention.
 10. Icons must make sense for the text or action they accompany.
-11. Don't enlarge icons past their design size; enclose them in a shape instead.
+11. Don't scale icons past their design size; enclose them in a shape.
 
 ## Applying it
 

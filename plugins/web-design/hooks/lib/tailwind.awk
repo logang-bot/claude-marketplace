@@ -74,6 +74,7 @@ function tw_arbitrary(b, line, blk, tag,   k, util, v, prop, iscolor) {
     else if (util ~ /^p[xytrblse]?$/) prop = "padding"
     else if (util ~ /^m[xytrblse]?$/ || util ~ /^space-[xy]$/) prop = "margin"
     else if (util ~ /^gap(-[xy])?$/) prop = "gap"
+    else if (util ~ /^rounded(-(t|r|b|l|s|e|tl|tr|br|bl|ss|se|es|ee))?$/) prop = "border-radius"
     if (prop != "") emit_decl(line, blk, tag, prop, v, "twa")
 }
 

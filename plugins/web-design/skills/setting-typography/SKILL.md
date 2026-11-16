@@ -39,7 +39,8 @@ paths: "**/*.css,**/*.scss,**/*.less,**/*.html,**/*.htm,**/*.vue,**/*.svelte,**/
 
 ## What the hook checks
 
-`TYPO-02` more than two families (or one not in DESIGN.md), `TYPO-04` more than 12 distinct font
-sizes in a file, `TYPO-05` body-text sizes under 16px, `TYPO-08` weights under 400 (including
+`TYPO-02` more than two families (or one not in DESIGN.md), `TYPO-04` a font-size off DESIGN.md's
+`type-scale` (or, with no scale there, more than 12 distinct sizes in a file), `TYPO-05` body-text sizes under 16px, `TYPO-08` weights under 400 (including
 `font-light`/`fontWeight: 300`), `TYPO-09` text measure over ~75 characters, `TYPO-10`
-line-height outside 1.5–2 on body text, `TYPO-13` justified text. The rest is judgement.
+line-height outside 1.5–2 on body text, `TYPO-13` justified text. The rest is judgement. A custom
+style can relax any of these in DESIGN.md except `TYPO-05`.

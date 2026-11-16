@@ -17,7 +17,7 @@ paths: "**/*.css,**/*.scss,**/*.less,**/*.html,**/*.htm,**/*.vue,**/*.svelte,**/
 8. Use the palette strategically in images and illustrations.
 9. On dark backgrounds, use a tint of the background colour for text.
 10. Text shouldn't be pure black; lighten it if it looks heavy.
-11. Don't make text too light: check contrast (4.5:1 normal text, 3:1 large text).
+11. Don't make text too light: 4.5:1 contrast (3:1 for large text).
 
 ## Applying it
 

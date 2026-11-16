@@ -1,6 +1,7 @@
 # Checks that need the whole set rather than one declaration. Function library for lint.awk.
 #
-# Per file:   TYPO-04  too many distinct font sizes      (no type scale)
+# Per file:   TYPO-04  too many distinct font sizes      (no type scale in DESIGN.md)
+#             RADIUS-04 too many distinct radii          (no radius scale in DESIGN.md)
 #             COLOR-03 too many distinct colour literals (no palette)
 #             SHADOW-02 too many distinct box-shadows    (no sm/md/lg scale)
 # Across the set the linter was given:
@@ -34,6 +35,16 @@ function crossfile_colors(d, raw,   v, lit, k) {
         if (++CF_COLORS[DP[d]] == 17)
             lint_find(DP[d], DL[d], "COLOR-03", "17th distinct colour literal in this file (" lit ") — define the palette (main colour, greys, tints, shades) as custom properties and reuse them", "colors")
     }
+}
+
+function crossfile_radius(d, v,   k) {
+    v = tolower(v)
+    if (v ~ /^0(px)?$/ || v ~ /%$/) return
+    k = DP[d] SUBSEP v
+    if (k in CF_RADIUS_SEEN) return
+    CF_RADIUS_SEEN[k] = 1
+    if (++CF_RADII[DP[d]] == 5)
+        lint_find(DP[d], DL[d], "RADIUS-04", "5th distinct border-radius in this file (" v ") — keep a small fixed set of radii", "radii")
 }
 
 function crossfile_shadow(d,   v, k) {

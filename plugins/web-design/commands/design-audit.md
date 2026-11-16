@@ -34,9 +34,10 @@ sh <path-to>/audit.sh --dirty         # no path: the uncommitted working tree
 ```
 
 It covers the measurable rules: contrast, weights, sizes, line-height, measure, justification,
-named and pure-black colours, palette and type-scale sprawl, shadow darkness, spacing scale,
-animation durations, link underlines, vague CTA text, mixed icon packs, raster icons, and
-mismatched side-by-side images.
+named and pure-black colours, palette sprawl, type scale, shadow darkness, spacing and radius
+scales, animation durations, link underlines, vague CTA text, mixed icon packs, raster icons, and
+mismatched side-by-side images. The scales come from DESIGN.md when it defines them, and rules it
+lists under `relax` are not reported (the audit prints which).
 
 ## 2. Judgement review (diffs and small targets)
 

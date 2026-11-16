@@ -13,7 +13,7 @@ paths: "**/*.css,**/*.scss,**/*.less,**/*.html,**/*.htm,**/*.vue,**/*.svelte,**/
 4. Show real people to trigger emotion.
 5. Crop images to fit the message.
 6. Experiment with combining photos, illustrations and patterns.
-7. Text on an image, method 1: darken or brighten it (fully, or with a gradient).
+7. Text on an image, method 1: darken or brighten it (fully or via a gradient).
 8. Method 2: place the text in a neutral area of the image.
 9. Method 3: put the text in a box.
 10. Serve images at 2x their displayed size for high-res screens.

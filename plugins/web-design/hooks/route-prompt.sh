@@ -59,7 +59,7 @@ planning=0
     && state_claim "$(state_file "$session" ruled)" && planning=1
 {
     printf '%s\n' "web-design: this request involves web design. Before writing markup or styles:"
-    [ "$planning" = 1 ] || printf '%s\n' "- Settle the website personality first (\`choosing-a-website-personality\` skill); every other design choice follows from it."
+    [ "$planning" = 1 ] || printf '%s\n' "- Settle the website personality first (\`choosing-a-website-personality\` skill): one of the seven, or a custom one when none fits. Every other design choice follows from it."
     if brief_file "$root" >/dev/null; then
         printf '%s\n' "- Read DESIGN.md at the project root and build with its personality and tokens. If the request changes them, update DESIGN.md first."
     else
