@@ -4,10 +4,10 @@ Hooks are the only part of a plugin that **executes on its own**. Skills, comman
 are markdown instructions that shape what Claude does; a hook is a program the harness runs at a
 fixed point in the loop, whether or not anyone asked.
 
-All seven here are POSIX shell for the glue and `awk` for anything that has to read code. They
+All thirteen here are POSIX shell for the glue and `awk` for anything that has to read code. They
 read the hook payload as JSON on stdin. The two guards in `dev-workflow` answer through their
 exit code; the five in `general-code-style` answer on **stdout in JSON**, because what they have
-to say is context rather than a verdict — and, in the case of the two style checks, because a
+to say is context rather than a verdict (the six in `web-design` answer the same way) — and, in the case of the two style checks, because a
 finding delivered through `exit 2` is rendered to the user as a hook *error*, which is what
 stalled agents mid-task before 0.11.0.
 
@@ -772,6 +772,28 @@ escaping — cutting escaped output could sever a `\uXXXX` and produce a payload
 parse.
 
 ---
+
+## The `web-design` hooks
+
+Six hooks with the same shape as the style hooks. Rules are injected before code exists,
+findings come back at the write, every path exits 0, and the answer goes out through
+`emit_context`. The full description is in [plugins/web-design.md](plugins/web-design.md#hooks).
+These are the points where they differ:
+
+| Script | Event | Differs from the style hooks in |
+|---|---|---|
+| `inject-rules.sh` | `SubagentStart` | Gated on the project containing markup, stylesheets or a `DESIGN.md`. Design rules are not universal, so a subagent in a backend repository gets nothing |
+| `route-prompt.sh` | `UserPromptSubmit` | Matches design intent by keyword and gives a personality-first pointer once per session. Without `DESIGN.md`, it has Claude ask the user (before any code) whether to create one or let Claude decide the style, when the request builds new pages; in plan mode it also gives the digest. This is the only event early enough for a question that must precede the code |
+| `inject-write-rules.sh` | `PreToolUse` | Triggers on writes to markup and stylesheets only; a plain `.ts` edit pays nothing. Without `DESIGN.md`, a new file leads with the create-or-decide question (once per session, and independent of the digest marker, so it still fires after an earlier edit was served), and an edit gets a one-line mention. The question leads, so a cut could only trim the digest's tail |
+| `snapshot-turn.sh` | `UserPromptSubmit` | The baseline is a `cksum` per dirty web file, not sizes and findings |
+| `check-batch.sh` | `PostToolBatch` | Scopes by tool. A `Write` owns the file; an `Edit` owns only lines found in the batch's `new_string`s (`lib/introduced.awk`) |
+| `check-turn.sh` | `Stop` | Ends by being silent rather than by a fingerprint. Findings are recorded as told, and the `/design-audit` pointer is given once per request |
+
+The linter (`hooks/lib/extract.awk` → `lint.awk` → `report.awk`) normalizes CSS, markup,
+Tailwind and CSS-in-JS into one declaration record before any rule runs. The extractors are
+character scanners rather than regex passes, because a `;` inside `url(data:…)`, a `>` inside
+a JSX expression, and a `${…}` inside a styled template all look like boundaries to a
+line-based regex.
 
 ## Adding a hook
 

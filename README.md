@@ -10,6 +10,7 @@ plugins so they travel between projects instead of living in one repo's `.claude
 /plugin install general-code-style@logang-bot
 /plugin install android-compose@logang-bot
 /plugin install dev-workflow@logang-bot
+/plugin install web-design@logang-bot
 ```
 
 To enable them automatically for everyone working in a project, commit this to the project's
@@ -25,7 +26,8 @@ To enable them automatically for everyone working in a project, commit this to t
   "enabledPlugins": {
     "general-code-style@logang-bot": true,
     "android-compose@logang-bot": true,
-    "dev-workflow@logang-bot": true
+    "dev-workflow@logang-bot": true,
+    "web-design@logang-bot": true
   }
 }
 ```
@@ -94,6 +96,45 @@ release time — the version-constant location, the release-notes language and a
 length cap, and pre-release deployment steps — searching the project's `CLAUDE.md`, then a
 release document under `docs/`, then the changelog files' own headers. A project using this
 plugin should document those four things in one of those places.
+
+### `web-design`
+
+Web front ends. Every design choice follows from a website personality, recorded with its tokens
+in the project's `DESIGN.md`. Day to day you run the two commands and make ordinary requests; the
+skills load on their own and the hooks apply the rules whether or not a skill was loaded.
+
+| Use case | Commands |
+|---|---|
+| Start a new web app | `/design-brief` → build page by page → `/design-audit <page>` |
+| Revise an existing project | `/design-audit src --lint-only` → `/design-brief` → `/design-audit <page>` per page |
+| Review one page or section | `/design-audit the pricing page` |
+| Check uncommitted work | `/design-audit` |
+
+More use cases, and every component in detail: [`docs/plugins/web-design.md`](docs/plugins/web-design.md).
+
+| Component | Name | What it does |
+|---|---|---|
+| Command | `/design-brief [personality]` | Decides the design: asks what it cannot infer about purpose, audience and feel, recommends a personality, and writes `DESIGN.md` with its tokens. Does not check code |
+| Command | `/design-audit [path or description] [--dirty] [--lint-only]` | Checks code against the rules and `DESIGN.md`: always the linter, plus both reviewer agents on a target of 30 files or fewer. Accepts paths or a page named in plain words; no argument means uncommitted work; `--lint-only` skips the agents |
+| Skill | `choosing-a-website-personality` | Seven personalities, and the typeface, colour, imagery, icon, shadow, radius and layout each implies |
+| Skill | `writing-a-design-brief` | The `DESIGN.md` format, including the `tokens` block the linter reads |
+| Skill | `setting-typography` | One or two proven typefaces, a type scale, 16–32px body text, weight ≥ 400, < 75 characters a line, line-height 1.5–2 |
+| Skill | `building-color-palettes` | Main colour plus grey, tints and shades as tokens, no pure black, 4.5:1 contrast |
+| Skill | `using-images-and-illustrations` | Relevant, original-looking imagery, three ways to put text over images, 2x and compressed, matching dimensions |
+| Skill | `using-icons` | One SVG pack matched to the type, text-coloured, enclosed in a shape rather than scaled up |
+| Skill | `applying-shadows-and-radius` | Light shadows in a sm/md/lg scale, radius matched to the typeface |
+| Skill | `spacing-with-whitespace` | Section > group > element spacing, proximity, a fixed spacing scale |
+| Skill | `establishing-visual-hierarchy` | Position, size, weight, colour and whitespace to rank what matters |
+| Skill | `designing-for-user-experience` | Known patterns, descriptive CTAs, links-only underline, 200–500ms animation, single-column forms, plain copy |
+| Skill | `composing-components-and-layouts` | A catalogue of components and layout patterns, assembled into a page |
+| Agent | `design-reviewer` | Read-only review of personality fit and visual design (areas 01–08): the judgement calls the linter cannot make |
+| Agent | `ux-reviewer` | Read-only review of UX, copy and layout (areas 09–10) |
+| Script | `scripts/audit.sh` | The linter: 20 measurable rules over CSS, HTML, Tailwind and CSS-in-JS. `--dirty` for uncommitted files, `--strict` to use it as a pre-commit gate |
+| Hook | `SubagentStart` | Gives subagents in a web project the rules, since they never load the skills themselves |
+| Hook | `UserPromptSubmit` | Records the uncommitted web files as a baseline. When a prompt is about design, tells Claude to settle the personality first; without `DESIGN.md`, Claude asks you before building new pages whether to create it with `/design-brief` or let it decide the style |
+| Hook | `PreToolUse` | Gives Claude the rules just before its first page or stylesheet write of the session; without `DESIGN.md`, the first new page also triggers the create-or-decide question |
+| Hook | `PostToolBatch` | Lints the web files a batch of writes produced and asks Claude to fix the findings now |
+| Hook | `Stop` | Lints everything the request changed, however it was written, and asks Claude to mention `/design-audit` once |
 
 ## Adding a platform plugin
 

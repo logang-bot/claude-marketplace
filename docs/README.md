@@ -22,10 +22,11 @@ underneath it.
 | [`general-code-style`](plugins/general-code-style.md) | File and function size, parameter counts, naming | Everywhere |
 | [`android-compose`](plugins/android-compose.md) | Composables, previews, routes, strings, use cases | Android projects |
 | [`dev-workflow`](plugins/dev-workflow.md) | Changelog, docs upkeep, git write policy | Everywhere |
+| [`web-design`](plugins/web-design.md) | Website personality, typography, colour, imagery, icons, spacing, hierarchy, UX, layout | Web front ends |
 
 ## The short version
 
-The marketplace is a plain git repository. `.claude-plugin/marketplace.json` lists three plugins;
+The marketplace is a plain git repository. `.claude-plugin/marketplace.json` lists four plugins;
 each has a manifest and some combination of skills, commands, agents, and hooks, discovered by
 directory convention. A project opts in through its `.claude/settings.json` and resolves the
 marketplace from GitHub.

@@ -1,0 +1,10 @@
+{
+  "name": "web-design",
+  "description": "Web design rules for typography, color, images, icons, shadows, border-radius, whitespace, visual hierarchy, UX, and layout, all driven by a chosen website personality. Hooks inject the rules before UI code is written and lint CSS, HTML, Tailwind, and CSS-in-JS afterwards; reviewer agents cover the judgement calls.",
+  "version": "0.1.2",
+  "author": {
+    "name": "logang-bot"
+  },
+  "repository": "https://github.com/logang-bot/claude-marketplace",
+  "license": "MIT"
+}

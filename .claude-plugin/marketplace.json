@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "logang-bot",
-  "description": "Personal engineering conventions packaged as installable plugins: platform-specific rules, language-agnostic code style, and release workflow.",
+  "description": "Personal engineering conventions packaged as installable plugins: platform-specific rules, language-agnostic code style, web design, and release workflow.",
   "owner": {
     "name": "logang-bot",
     "email": "logangch8v@gmail.com"
@@ -50,6 +50,24 @@
         "git"
       ],
       "source": "./plugins/dev-workflow"
+    },
+    {
+      "name": "web-design",
+      "description": "Web design rules for typography, colour, images, icons, shadows, border-radius, whitespace, visual hierarchy, UX, and layout, all driven by a chosen website personality and recorded in a DESIGN.md brief. Ships design and UX reviewer agents, plus hooks that inject the rules before UI code is written and lint CSS, HTML, Tailwind, and CSS-in-JS afterwards.",
+      "author": {
+        "name": "logang-bot"
+      },
+      "category": "design",
+      "keywords": [
+        "web-design",
+        "css",
+        "ui",
+        "ux",
+        "tailwind",
+        "typography",
+        "accessibility"
+      ],
+      "source": "./plugins/web-design"
     }
   ]
 }

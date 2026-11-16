@@ -36,7 +36,8 @@ A project opts in through its `.claude/settings.json`:
   "enabledPlugins": {
     "general-code-style@logang-bot": true,
     "android-compose@logang-bot": true,
-    "dev-workflow@logang-bot": true
+    "dev-workflow@logang-bot": true,
+    "web-design@logang-bot": true
   }
 }
 ```

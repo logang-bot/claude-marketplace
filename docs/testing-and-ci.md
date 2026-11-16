@@ -82,6 +82,22 @@ twice to make two assertions is itself one of the behaviours under test. And the
 answer back through the plugin's own `lib/json.awk`, which doubles as a check that what the hook
 emits is JSON a client could actually parse.
 
+The `web-design` plugin has seven suites. Each linter rule gets a must-flag and a must-pass case:
+
+| Suite | Asks |
+|---|---|
+| `test_extract.sh` | Does each declaration keep its selector, value, and line, through SCSS nesting, multi-line JSX objects and inline styles, and styled templates? |
+| `test_lint_css.sh` | Every CSS rule in both directions, the DESIGN.md tokens, and `audit.sh --strict` |
+| `test_lint_tailwind_jsx.sh` | HTML, Vue, JSX, styled-components and Tailwind normalized to the same findings, and what must stay unread (comments, `<script>`, Tailwind classes without Tailwind) |
+| `test_contrast.sh` | Colour parsing in every syntax, and WCAG ratios against published reference values |
+| `test_inject.sh` | Who gets the rules digest, once per session, and whether the last rule line survives the 7000-character cut on every path |
+| `test_batch.sh` | Whether a Write owns its whole file and an Edit only its own lines, said once, through both payload shapes |
+| `test_turn.sh` | The request baseline, shell-written files, cross-file findings, the once-per-request pointer, wakes, and loop termination |
+
+Fixtures in these suites are passed to helpers as arguments, never piped in. A check function at
+the end of a pipeline runs in a subshell, so its failure count would be lost and the suite would
+pass.
+
 ## What `validate.yml` checks
 
 Runs on every push and pull request, in two jobs: `manifests` on `ubuntu-latest` and `windows` on
