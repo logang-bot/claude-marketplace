@@ -21,7 +21,7 @@ underneath it.
 |---|---|---|
 | [`general-code-style`](plugins/general-code-style.md) | File and function size, parameter counts, naming | Everywhere |
 | [`android-compose`](plugins/android-compose.md) | Composables, previews, routes, strings, use cases | Android projects |
-| [`dev-workflow`](plugins/dev-workflow.md) | Changelog, docs upkeep, git write policy | Everywhere |
+| [`dev-workflow`](plugins/dev-workflow.md) | Changelog, docs upkeep, git writes on request | Everywhere |
 | [`web-design`](plugins/web-design.md) | Website personality, typography, colour, imagery, icons, spacing, hierarchy, UX, layout | Web front ends |
 
 ## The short version

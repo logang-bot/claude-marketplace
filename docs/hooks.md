@@ -4,9 +4,9 @@ Hooks are the only part of a plugin that **executes on its own**. Skills, comman
 are markdown instructions that shape what Claude does; a hook is a program the harness runs at a
 fixed point in the loop, whether or not anyone asked.
 
-All thirteen here are POSIX shell for the glue and `awk` for anything that has to read code. They
-read the hook payload as JSON on stdin. The two guards in `dev-workflow` answer through their
-exit code; the five in `general-code-style` answer on **stdout in JSON**, because what they have
+All twelve here are POSIX shell for the glue and `awk` for anything that has to read code. They
+read the hook payload as JSON on stdin. The one in `dev-workflow` answers through its exit
+code; the five in `general-code-style` answer on **stdout in JSON**, because what they have
 to say is context rather than a verdict (the six in `web-design` answer the same way) — and, in the case of the two style checks, because a
 finding delivered through `exit 2` is rendered to the user as a hook *error*, which is what
 stalled agents mid-task before 0.11.0.
@@ -64,8 +64,8 @@ guard. Those are described in their sections below.
 ### Hooks fail open
 
 That last row is the important one. A hook with a syntax error exits `1`, and exit `1` is a
-non-blocking error — so a typo in `block-git-writes.sh` does not produce a loud failure. The
-guard just silently stops guarding.
+non-blocking error — so a typo in `docs-reminder.sh` does not produce a loud failure. The
+hook just silently stops reminding.
 
 This is why `Check hook scripts parse` is a CI step: a hook that cannot run is
 indistinguishable, in the moment, from a hook that decided to allow the command.
@@ -90,13 +90,13 @@ would break, since the plugin runs from the cache, not from this repo:
 {
   "PreToolUse": [
     {
-      "matcher": "Bash",
+      "matcher": "ExitPlanMode|Skill|Write|Edit|MultiEdit|NotebookEdit",
       "hooks": [
         {
           "type": "command",
           "shell": "bash",
-          "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/block-git-writes.sh\"",
-          "timeout": 10
+          "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-plan-rules.sh\"",
+          "timeout": 15
         }
       ]
     }
@@ -121,64 +121,6 @@ shipped script would arrive with CRLF endings and bash would fail on them with
 `\r: command not found` — a fresh silent-hook failure of exactly the kind this migration exists
 to end. The repo's `.gitattributes` pins `* text=auto eol=lf`, and the Windows CI job asserts no
 CRLF survives a checkout.
-
----
-
-## `block-git-writes.sh`
-
-**Event:** `PreToolUse` · **Matcher:** `Bash` · **Timeout:** 10s · Plugin: `dev-workflow`
-
-**Payload keys read:** `tool_name`, `tool_input.command`
-
-The shell reads the payload and hands the command to `lib/git-rules.awk` on **stdin** — not
-through `-v`, because awk expands escape sequences in a `-v` value and would rewrite backslashes
-in the very command it is judging.
-
-`git-rules.awk` splits the command on `&&`, `||`, `;` and `|`, two-character operators first so
-`||` is never read as two empty pipes, then tests each segment. `gh` patterns are checked first,
-on every segment. Git rules are only consulted for segments that actually start with `git`.
-
-Matching is **anchored to the subcommand slot**. The Python original expressed that as one regex
-with non-capturing groups; ERE has no equivalent, so `git_parts()` strips the leading `git` and
-then consumes the global-option run in a loop:
-
-```
--[cC] <value>              |  --git-dir=… / --work-tree … / --namespace / --exec-path  |  -<anything>
-```
-
-The global-option run is what lets `git -C /path <write>` be caught — without it, `-C` would be
-mistaken for the subcommand. What remains begins with the subcommand, which is looked up in
-`ALWAYS` (blocked outright) or handled by a predicate over the rest (`reset` only with `--hard`,
-`tag` unless `-l`/`--list`, `checkout` only with `-b`/`-B`, and so on). `has_flag` understands
-clustered short flags, so `clean -xdf` matches `-f`; only lowercase short flags cluster, so `-B`
-and `-D` stay distinct.
-
-Anchoring is not cosmetic. An earlier version matched patterns anywhere in the segment, which
-denied read-only commands like `git log --grep=commit`.
-
-### Testing it — put fixtures in a file
-
-The hook scans the **entire Bash command string**. A test harness with a blocked command written
-on the command line is itself a command containing that blocked command, so the installed hook
-blocks your test run.
-
-Keep fixtures in a script instead, assembled at runtime so they are inert on disk:
-
-```sh
-G=$(printf 'g%s' 'it')
-must_block() {
-cat <<EOF
-$G push --force
-EOF
-}
-```
-
-An unquoted heredoc expands `$G` when the test runs, while the file on disk only ever contains
-`$G push --force`.
-
-Test both directions. A guard that blocks everything is as broken as one that blocks nothing.
-The suite is `plugins/dev-workflow/tests/test_block_git_writes.sh`: 35 must-block and 34
-must-pass cases. `test_docs_reminder.sh` next to it covers the reminder's classification.
 
 ---
 
@@ -804,7 +746,8 @@ line-based regex.
 4. Register it in that plugin's `hooks/hooks.json` using `${CLAUDE_PLUGIN_ROOT}` and
    `"shell": "bash"`.
 5. Give it a `timeout`. A hook that hangs stalls the tool call.
-6. Add fixtures covering both must-block and must-pass, per the pattern above.
+6. Add fixtures under `tests/` covering both directions — inputs that must trigger the hook and
+   inputs that must not. A hook that fires on everything is as broken as one that never fires.
 7. Check what `exit 2` means on your event before relying on it — it blocks on `PreToolUse` and
    `Stop`, is advice on `PostToolUse` and `PostToolBatch`, and on `UserPromptSubmit` would block
    the user's own prompt, which is never what you want. A hook that only injects context wants

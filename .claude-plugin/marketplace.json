@@ -38,7 +38,7 @@
     },
     {
       "name": "dev-workflow",
-      "description": "Release and documentation workflow: two-file changelog discipline, docs upkeep, and a hook that keeps git write commands in the developer's hands.",
+      "description": "Release and documentation workflow: two-file changelog discipline, docs upkeep, and git writes run only when the developer asks for them.",
       "author": {
         "name": "logang-bot"
       },

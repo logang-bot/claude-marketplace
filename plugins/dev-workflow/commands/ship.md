@@ -24,11 +24,14 @@ Follow the `updating-changelog-or-release-notes` skill. In order:
    as a feature.
 5. **Reset `CHANGELOG.unreleased.md`**, leaving the header and an empty pending section.
 
-Then **stop**. Do not run git — no commit, no tag, no push. Print for the user:
+Then **stop** after the file edits. Print for the user:
 
-- the version and the exact tag to push
-- the commit message you would have used
+- the version and the exact tag
+- the commit message you would use
 - any pre-release deployment steps the project documents, called out as blocking
+
+Offer to commit, tag, and push, but run them only if the user says yes, and only the steps
+they agree to. See `git-writes-on-request`.
 
 Report the character count of the new section if the project has a cap, so the user can see
 it fits.

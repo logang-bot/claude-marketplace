@@ -37,26 +37,11 @@ permissive direction — see [hooks.md](hooks.md#hooks-fail-open). `sh -n` prove
 it proves nothing about whether the logic is right.
 
 Test with fixtures kept **in a file**, driving the hook's own awk modules rather than
-re-implementing their logic in the harness:
+re-implementing their logic in the harness, so the test exercises the code that ships.
 
-```sh
-G=$(printf 'g%s' 'it')
-must_block() {
-cat <<EOF
-$G push --force
-EOF
-}
-```
-
-The reason fixtures live in a file rather than on the command line: `block-git-writes.sh` scans
-the entire Bash command string, so a harness that spells a blocked command out as an argument
-*is* a command containing it, and the installed hook blocks the test run. An unquoted heredoc
-expands `$G` only when the test runs, so the file on disk stays inert.
-
-Always test both directions. `plugins/dev-workflow/tests/test_block_git_writes.sh` is 35
-must-block and 34 must-pass cases; the must-pass half is what caught the anchoring bug, where
-read-only commands like `git log --grep=commit` were being denied, and it is what made the
-guard safe to refactor. `test_docs_reminder.sh` covers the reminder's file classification.
+Always test both directions: inputs that must trigger the hook and inputs that must not. A hook
+that fires on everything is as broken as one that never fires.
+`plugins/dev-workflow/tests/test_docs_reminder.sh` covers the reminder's file classification.
 
 `plugins/general-code-style/tests/test_style_rules.sh` covers the size and comment measurements
 through `tests/probe.awk`, a test-only driver that prints the measurements themselves rather than
@@ -163,5 +148,5 @@ consumer to pin to.
    without a bump installed clients have no signal to refetch.
 3. Update the affected page under [`plugins/`](plugins/), and sweep the other docs for claims the
    change made stale.
-4. Commit and push yourself. The `dev-workflow` hook blocks Claude from doing it, deliberately.
+4. Commit and push, yourself or by asking Claude to. Claude does not do it unprompted.
 5. Confirm the run is green in the repo's Actions tab.

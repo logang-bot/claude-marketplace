@@ -85,10 +85,9 @@ Process rules. Platform-agnostic.
 |---|---|---|
 | Skill | `updating-changelog-or-release-notes` | Two-file changelog discipline; looks up the project's own release specifics |
 | Skill | `updating-docs` | Every behaviour change ends with a docs update and a stale-claim sweep |
-| Skill | `no-git-writes` | Why git writes are blocked and what to do instead |
+| Skill | `git-writes-on-request` | Commit, push, and tag only when the user asks; confirm before rewriting history |
 | Command | `/changelog <text>` | Appends a bullet to the unreleased scratchpad |
 | Command | `/ship <version>` | Distills the scratchpad into a release section and bumps the version |
-| Hook | `PreToolUse` | Denies `git commit`/`push`/`tag`/`rebase` and publishing `gh` subcommands |
 | Hook | `Stop` | Reminds when code changed but nothing in `docs/` did |
 
 The changelog skill deliberately carries no project specifics. It looks up four things at
@@ -172,7 +171,7 @@ checkout instead:
 
 Hook scripts are POSIX shell and awk, so they run wherever git does — including Git Bash on
 Windows, which is the shell Claude Code uses for hooks there. They read the hook payload on
-stdin; the two guards in `dev-workflow` answer with exit 2, while the style hooks answer on
+stdin; the docs reminder in `dev-workflow` answers with exit 2, while the style hooks answer on
 stdout with `hookSpecificOutput.additionalContext`, which reaches the model as feedback rather
 than as an error. Every one exits 0 on malformed input, a missing file, or a non-git directory,
 so a broken hook degrades to silence rather than blocking work.

@@ -122,7 +122,7 @@ practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/bes
 The *what* carries the terms a task will actually contain; the *when* tells the model the
 moment has arrived. Drop either half and discovery degrades:
 
-- **What only** — "Explains why git write commands are blocked" — never loads at the moment
+- **What only** — "Explains when git write commands are allowed" — never loads at the moment
   Claude is about to commit, which is the only moment it matters.
 - **When only** — "When creating files or classes, follow the instructions explained here" —
   matches nothing specific, because the 200-line cap and the naming rule never reach the matcher.
@@ -145,7 +145,7 @@ command here handles the empty case by asking or falling back to the working tre
 its package" rather than "use cases live in `domain/usecase/`". The CI leakage step greps for the
 phrases that mark this mistake. Examples are fine — assertions are not.
 
-**Cross-reference by bare name** (`` `identifying-use-cases` ``, `` `no-git-writes` ``). Within a
+**Cross-reference by bare name** (`` `identifying-use-cases` ``, `` `updating-docs` ``). Within a
 plugin this always resolves; across plugins it resolves when both are installed, so word it as a
 pointer rather than a dependency.
 

@@ -1,7 +1,7 @@
 {
   "name": "dev-workflow",
-  "description": "Release and documentation workflow: changelog discipline, docs upkeep, and git write protection.",
-  "version": "0.3.0",
+  "description": "Release and documentation workflow: changelog discipline, docs upkeep, and git writes only on request.",
+  "version": "0.4.0",
   "author": {
     "name": "logang-bot"
   },

@@ -1,7 +1,7 @@
 # `dev-workflow`
 
 Process rules rather than code rules: how changes get recorded, how releases are prepared, how
-documentation stays true, and who is allowed to write to git.
+documentation stays true, and when Claude may write to git.
 
 **Platform-agnostic.** Nothing here assumes a language or a build system.
 
@@ -11,12 +11,11 @@ documentation stays true, and who is allowed to write to git.
 |---|---|---|
 | Skill | `updating-changelog-or-release-notes` | Recording a change, bumping a version, preparing a release |
 | Skill | `updating-docs` | A behaviour change is complete and the project has `docs/` |
-| Skill | `no-git-writes` | A git write is attempted or discussed |
+| Skill | `git-writes-on-request` | A commit, push, tag, or PR is about to happen or is requested |
 | Command | `/changelog <text>` | Run explicitly |
 | Command | `/ship <version>` | Run explicitly |
-| Hook | `PreToolUse` on `Bash` | Automatically, before every shell command |
 | Hook | `Stop` | Automatically, at the end of every turn |
-| Tests | `tests/test_*.sh` | In CI, and before pushing a change to either hook |
+| Tests | `tests/test_*.sh` | In CI, and before pushing a change to the hook |
 
 ## The two-file changelog
 
@@ -68,9 +67,9 @@ full, sets the version constant, distills all pending bullets into **one** new `
 section in the house style, and resets the scratchpad to an empty pending section. A change with
 no user-visible effect is described plainly as such rather than dressed up as a feature.
 
-Then it **stops** and prints the version, the exact tag to push, the commit message it would have
-used, and any pre-release deployment steps called out as blocking. It does not run git — see
-below.
+Then it **stops** and prints the version, the exact tag, the commit message it would use, and
+any pre-release deployment steps called out as blocking. It offers to commit, tag, and push, and
+runs only the steps you agree to. See below.
 
 ## Documentation upkeep
 
@@ -89,23 +88,19 @@ Internal refactors that change no behaviour, no interface, and no operational pr
 doc update. The scope rule is to update what you changed and mention unrelated imperfect docs to
 the user rather than rewriting them.
 
-## The git-write policy
+## Git writes on request
 
-**The developer runs all git write commands themselves.** This is deliberate policy, enforced by
-a `PreToolUse` hook rather than by good intentions.
+**Claude commits, pushes, and tags only when you ask.** Finishing a task is not a request to
+commit it. This is an instruction in the `git-writes-on-request` skill, not a hook, so nothing
+blocks the command once you have asked.
 
-Blocked: `commit`, `push`, `tag` (unless listing), `merge`, `rebase`, `revert`, `cherry-pick`,
-`reset --hard`, `checkout -b/-B`, `switch -c/-C`, `branch -d/-D`, `stash drop/clear/pop`,
-`clean -f`, `filter-branch`, and the publishing `gh` subcommands (`pr create|merge|close|…`,
-`release create|…`, `repo create|…`, `issue create|…`).
+- A request covers only the action it names: "commit" does not mean push, and a commit approved
+  earlier does not cover later edits.
+- Commands that discard work or rewrite published history (`push --force`, `reset --hard`,
+  `clean -f`, amending or rebasing pushed commits, `branch -D`, deleting remote refs) are
+  confirmed first, even after a general request.
+- Without a request, Claude finishes the edits, stops, and offers the commit in one line.
+- Read-only commands (`status`, `diff`, `log`, `show`, `blame`, `ls-files`) need no request.
 
-Not blocked: everything read-only — `status`, `diff`, `log`, `show`, `blame`, `ls-files` — plus
-plain `git reset` (unstaging) and plain `git stash`.
-
-When blocked, the expected behaviour is to finish the file edits, then stop and hand over: what
-changed, and the exact commands to paste including the commit message. Routing around the block
-with `gh`, an alias, or a script defeats its point, which is that you stay the one deciding what
-enters history.
-
-See [../hooks.md](../hooks.md#block-git-writespy) for how the matching actually works and how to
-test it.
+Earlier versions (≤ 0.3.0) enforced a stricter policy with a `PreToolUse` hook that denied every
+git write. It was removed in 0.4.0 so agents can commit and push when asked.

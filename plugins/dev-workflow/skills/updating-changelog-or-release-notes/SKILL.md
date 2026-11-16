@@ -59,8 +59,9 @@ Skip changes with no user or security impact: internal refactors, docs, tests, t
 
 ## Boundaries
 
-- **Do not run git commands** — no commit, tag, or push. Stop after the file edits and tell
-  the user the version and tag to push. See `no-git-writes`.
+- **Do not commit, tag, or push on your own.** Stop after the file edits, tell the user the
+  version and tag, and offer to run them. Run only what the user agrees to. See
+  `git-writes-on-request`.
 - Before a production release, remind the user of any pre-release deployment steps the
   project documents. Skipping them typically breaks the shipped build at runtime, not at
   build time, so it fails silently until a user hits it.
