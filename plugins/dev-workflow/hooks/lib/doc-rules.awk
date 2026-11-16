@@ -8,7 +8,7 @@ BEGIN {
               named, " ")
     for (i = 1; i <= n; i++) CODE[named[i]] = 1
     n = split("md mdx rst adoc txt", named, " ")
-    for (i = 1; i <= n; i++) DOC[named[i]] = 1
+    for (i = 1; i <= n; i++) DOC_EXT[named[i]] = 1
 }
 
 $0 == "" { next }
@@ -18,7 +18,7 @@ $0 == "" { next }
     sub(/.*\//, "", base)
     ext = ""
     if (base ~ /\./) { ext = base; sub(/.*\./, "", ext) }
-    if (index($0, "docs/") == 1 || (ext in DOC)) { seen_doc = 1; next }
+    if (index($0, "docs/") == 1 || (ext in DOC_EXT)) { seen_doc = 1; next }
     if (ext in CODE) print
 }
 
